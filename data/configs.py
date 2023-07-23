@@ -3,7 +3,31 @@ from data.loader import pyrogram_client, ResolveUsername
 from data.loader import bot
 import re
 from database.database import collection, ObjectId
-from datetime import datetime
+from datetime import datetime, timedelta
+import time
+import pytz
+from keyboards.inline_keyboards import generate_add_button
+
+def calculate_end_date(days):
+    tz_moscow = pytz.timezone('Europe/Moscow')
+
+    current_datetime = datetime.now()
+    formatted_date = current_datetime.strftime("%d.%m.%Y")
+
+    start_date = datetime.strptime(formatted_date, "%d.%m.%Y")
+
+    start_date = tz_moscow.localize(start_date)
+
+    end_date = start_date + timedelta(days=days)
+
+    formatted_date_with_time = end_date.strftime("%H:%M %d.%m.%Y")
+
+
+    # ЮНИКС тайм
+    new_datetime = current_datetime + timedelta(days=days)
+    unix_time = int(time.mktime(new_datetime.timetuple()))
+
+    return [formatted_date_with_time, unix_time]
 
 def add_time_to_unix(unix_time, time_string):
     time_in_seconds = 0
@@ -24,6 +48,30 @@ def add_time_to_unix(unix_time, time_string):
     new_unix_time = unix_time + time_in_seconds
     return new_unix_time
 
+def get_dict_index(database, groupid: str):
+    index_of_chat = 0
+    for index, item in enumerate(database['settings']):
+        if item.get("chat_id") == str(groupid):
+            index_of_chat = index
+            break
+    return index_of_chat
+
+def get_user_dict_index(dict):
+    index_dict = None
+    for index, obj in enumerate(dict):
+        if "type" in obj and obj["type"] == 'text_mention':
+            index_dict = index
+    return index_dict
+
+def get_price_index(days):
+    index_of_price = 0
+    db = collection.find_one({"_id": ObjectId('64987b1eeed9918b13b0e8b4')})
+    for index, item in enumerate(db['price']):
+        if item.get("period") == str(days):
+            index_of_price = index
+            break
+    return index_of_price
+
 async def resolve_username_to_user_id(username: str) -> int | None:
     try:
         async with pyrogram_client:
@@ -34,6 +82,16 @@ async def resolve_username_to_user_id(username: str) -> int | None:
     except Exception as e:
         print(e)
 
+
+async def done_message(chat_id):
+    try:
+        await asyncio.sleep(2)
+        await bot.send_message(chat_id=chat_id,
+                               text='Здравствуйте! Я бот-админ и могу администрировать ваш групповой чат.\n\nДля того чтобы начать, добавьте меня в свой групповой чат:',
+                               reply_markup=generate_add_button())
+
+    except Exception as e:
+        print('error delete')
 
 async def delete_message(timer_s, message_ids: list, chat_id):
     try:
@@ -88,17 +146,14 @@ def time_diff(time1, time2):
 
     return int(seconds)
 
+
 async def active():
     chat_ids = collection.find_one({"_id": ObjectId('64987b1eeed9918b13b0e8b4')})['groups']
     while True:
         for chat_id in chat_ids:
             try:
                 db = collection.find_one({'chats': chat_id})
-                index_of_chat = 0
-                for index, item in enumerate(db['settings']):
-                    if item.get("chat_id") == str(chat_id):
-                        index_of_chat = index
-                        break
+                index_of_chat = get_dict_index(db, chat_id)
 
                 dif = time_diff(db['settings'][index_of_chat]['last_msg'], datetime.now().strftime('%H:%M:%S'))
                 if dif >= 60:

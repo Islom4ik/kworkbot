@@ -1,12 +1,15 @@
 # Обработчики нажатых, встроенных кнопок под сообщениями:
 import asyncio
 
-from data.loader import bot, dp, FSMContext, State
+from data.loader import bot, dp, FSMContext, State, config
 from database.database import collection, ObjectId
 from states_scenes.scene import MySceneStates
-from aiogram.types import CallbackQuery
-from keyboards.inline_keyboards import generate_my_chats, generate_add_b_resources, generate_back_to_main, generate_system_notice_show, generate_add_button, generate_settings_button, generate_edit_text_settings, generate_settings, generate_text_editing_page, generate_rules_editing_page, generate_warning_editing_page, generate_afk_editing_page, generate_admins_settings, generate_block_repostes_show, generate_block_ping_show, generate_block_resources_show, generate_money_top_up
+from aiogram.types import CallbackQuery, InputFile, ContentTypes, LabeledPrice, PreCheckoutQuery, Message
+from data.configs import calculate_end_date, get_price_index, done_message, delete_message, get_dict_index
+from keyboards.inline_keyboards import generate_back_to_settings, generate_back_to_profil, generate_payment_method, generate_payment_page, generate_my_chats, generate_add_b_resources, generate_admin_main_page, generate_back_to_main, generate_system_notice_show, generate_add_button, generate_settings_button, generate_edit_text_settings, generate_settings, generate_text_editing_page, generate_rules_editing_page, generate_warning_editing_page, generate_afk_editing_page, generate_admins_settings, generate_block_repostes_show, generate_block_ping_show, generate_block_resources_show, generate_money_top_up
 import re
+from datetime import datetime
+import pytz
 
 
 @dp.callback_query_handler(lambda call: call.data == 'check_admingr')
@@ -38,7 +41,6 @@ async def check_admin_rght(call: CallbackQuery):
     except Exception as e:
         print(e)
 
-
 @dp.callback_query_handler(lambda call: call.data == 'settings_texts')
 async def change_to_edit_page(call: CallbackQuery):
     try:
@@ -51,12 +53,21 @@ async def change_to_edit_page(call: CallbackQuery):
     except Exception as e:
         print(e)
 
+@dp.callback_query_handler(lambda call: call.data == 'back_from_edit_limits')
+async def answer_to_back_from_edits(call: CallbackQuery):
+    await bot.edit_message_caption(chat_id=call.message.chat.id, message_id=call.message.message_id, caption=f'Добро пожаловать в админку, <a href="tg://user?id={call.from_user.id}">{call.from_user.first_name}</a>', reply_markup=generate_admin_main_page())
+
 @dp.callback_query_handler(lambda call: call.data == 'back_to_chose')
 async def react_to_back(call: CallbackQuery):
     try:
         group_id_url = call.message.entities[0].url
-        group_id = int("-" + re.sub(r"\D", "", group_id_url))
+        group_id = "-" + re.sub(r"\D", "", group_id_url)
+        db = collection.find_one({"chats": group_id})
+        index_of_chat = get_dict_index(db, group_id)
         await call.answer()
+        if db['settings'][index_of_chat]['lic'] == True: return await bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id,
+                                    text=f'⚙ Настройки чата (<a href="https://{group_id}.id">{group_id}</a>)',
+                                    reply_markup=generate_settings(True))
         await bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id,
                                     text=f'⚙ Настройки чата (<a href="https://{group_id}.id">{group_id}</a>)',
                                     reply_markup=generate_settings())
@@ -68,9 +79,7 @@ async def react_to_done(call: CallbackQuery):
     try:
         await call.answer()
         await bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id, text=f'⚙ Настройки чата завершена')
-        await asyncio.sleep(2)
-        await bot.send_message(chat_id=call.message.chat.id, text='Здравствуйте! Я бот-админ и могу администрировать ваш групповой чат.\n\nДля того чтобы начать, добавьте меня в свой групповой чат:',
-            reply_markup=generate_add_button())
+        asyncio.create_task(done_message(chat_id=call.message.chat.id))
     except Exception as e:
         print(e)
 
@@ -81,11 +90,7 @@ async def text_greeting_show(call: CallbackQuery):
         group_id = "-" + re.sub(r"\D", "", group_id_url)
         db = collection.find_one({"chats": str(group_id)})
 
-        index_of_chat = 0
-        for index, item in enumerate(db['settings']):
-            if item.get("chat_id") == group_id:
-                index_of_chat = index
-                break
+        index_of_chat = get_dict_index(db, group_id)
 
         text = db["settings"][index_of_chat]['greeting']
 
@@ -108,11 +113,7 @@ async def text_rules_show(call: CallbackQuery):
         group_id = "-" + re.sub(r"\D", "", group_id_url)
         db = collection.find_one({"chats": str(group_id)})
 
-        index_of_chat = 0
-        for index, item in enumerate(db['settings']):
-            if item.get("chat_id") == group_id:
-                index_of_chat = index
-                break
+        index_of_chat = get_dict_index(db, group_id)
 
         text = db["settings"][index_of_chat]['rules']
 
@@ -135,32 +136,23 @@ async def text_warning_show(call: CallbackQuery):
         group_id = "-" + re.sub(r"\D", "", group_id_url)
         db = collection.find_one({"chats": str(group_id)})
 
-        index_of_chat = 0
-        for index, item in enumerate(db['settings']):
-            if item.get("chat_id") == group_id:
-                index_of_chat = index
-                break
+        index_of_chat = get_dict_index(db, group_id)
 
-        text = db["settings"][index_of_chat]['warning']
-
-        await call.answer()
-        if text == 'None':
-            await bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id,
-                                        text=f'⚙ Настройки чата (<a href="https://{group_id}.id">{group_id}</a>)\n<b>Уведомление при нарушении:</b>\n\nВы нарушаете наши правила! Запрещены любые ссылки!',
-                                        reply_markup=generate_warning_editing_page())
-        else:
-            await bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id,
-                                        text=f'⚙ Настройки чата (<a href="https://{group_id}.id">{group_id}</a>)\n<b>Уведомление при нарушении:</b>\n\n{text}',
-                                        reply_markup=generate_warning_editing_page())
+        await bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id,
+                                    text=f'⚙ Настройки чата (<a href="https://{group_id}.id">{group_id}</a>)\n<b>Сообщения о бане | кике | разбане\nНажмите на одну из кнопок, чтобы изменить сообщение о:</b>\n\n<b>BAN:</b>\n{db["settings"][index_of_chat]["warning_ban"]}\n\n<b>KICK:</b>\n{db["settings"][index_of_chat]["warning_kick"]}\n\n<b>UNBAN:</b>\n{db["settings"][index_of_chat]["unban_text"]}',
+                                    reply_markup=generate_warning_editing_page())
     except Exception as e:
         print(e)
+
 
 
 
 @dp.callback_query_handler(lambda call: call.data == 'formating')
 async def format_btn_react(call: CallbackQuery):
     try:
-        await call.answer('💿 Для форматирования текста мы используем HTML форматирование и вы можете встроить HTML форматирование в ваш текст\n\nФичи:\n{member_name} - имя нового участника чата', show_alert=True)
+        trash = await bot.send_message(call.message.chat.id, '💿 Для форматирования текста мы используем HTML форматирование и вы можете встроить HTML форматирование в ваш текст\n\nФичи:\n{member_name} - имя участника(участников) чата с которым связан контекст бота;\n\n{admin} - имя администратора с которым связанно действие бота(Можно использовать в сообщение о бане, кике, unban)')
+        asyncio.create_task(delete_message(20, [trash.message_id], trash.chat.id))
+        await call.answer()
     except Exception as e:
         print(e)
 
@@ -171,11 +163,7 @@ async def text_afk_show(call: CallbackQuery):
         group_id = "-" + re.sub(r"\D", "", group_id_url)
         db = collection.find_one({"chats": str(group_id)})
 
-        index_of_chat = 0
-        for index, item in enumerate(db['settings']):
-            if item.get("chat_id") == group_id:
-                index_of_chat = index
-                break
+        index_of_chat = get_dict_index(db, group_id)
 
         text = db["settings"][index_of_chat]['afk']
 
@@ -220,14 +208,34 @@ async def scenes_editor(call: CallbackQuery):
             await call.answer()
             await MySceneStates.rules_change_text_scene.set()
             await bot.send_message(call.message.chat.id, '📋 Введите текст правил чата:')
-        elif call_main == 'warning':
+        elif call_main == 'banwarning':
             await call.answer()
-            await MySceneStates.warning_change_text_scene.set()
-            await bot.send_message(call.message.chat.id, '📋 Введите текст, который будет уведомлять участников чата при нарушений:')
+            await MySceneStates.banwarning_change_text_scene.set()
+            await bot.send_message(call.message.chat.id, '📋 Введите текст, который будет отправлен после использования команды ban:')
+        elif call_main == 'kickwarning':
+            await call.answer()
+            await MySceneStates.kickwarning_change_text_scene.set()
+            await bot.send_message(call.message.chat.id, '📋 Введите текст, который будет отправлен после использования команды kick:')
+        elif call_main == 'unbantext':
+            await call.answer()
+            await MySceneStates.unbantext_change_text_scene.set()
+            await bot.send_message(call.message.chat.id, '📋 Введите текст, который будет отправлен после использования команды unban:')
         elif call_main == 'afk':
             await call.answer()
             await MySceneStates.afk_change_text_scene.set()
             await bot.send_message(call.message.chat.id, '📋 Введите текст, который будет уведомлять чат при неактивности:')
+        elif call_main == 'resourcesw':
+            await call.answer()
+            await MySceneStates.resourcesw_change_scene.set()
+            await bot.send_message(call.message.chat.id, '📋 Введите текст, который будет отправлен при нарушения правила внешних ресурсов:')
+        elif call_main == 'repostesw':
+            await call.answer()
+            await MySceneStates.repostesw_change_scene.set()
+            await bot.send_message(call.message.chat.id, '📋 Введите текст, который будет отправлен при нарушения правила репостов:')
+        elif call_main == 'pingw':
+            await call.answer()
+            await MySceneStates.pingw_change_scene.set()
+            await bot.send_message(call.message.chat.id, '📋 Введите текст, который будет отправлен при нарушения правила пинга:')
         else:
             await call.answer()
     except Exception as e:
@@ -263,13 +271,11 @@ async def react_to_block_resources_show(call: CallbackQuery):
         group_id = "-" + re.sub(r"\D", "", group_id_url)
         db = collection.find_one({"user_id": call.from_user.id})
 
-        index_of_chat = 0
-        for index, item in enumerate(db['settings']):
-            if item.get("chat_id") == group_id:
-                index_of_chat = index
-                break
+        index_of_chat = get_dict_index(db, group_id)
         await call.answer()
-        await bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id, text=f'⚙ Настройки чата (<a href="https://{group_id}.id">{group_id}</a>)\n\nБлокировка ссылок на внешние ресурсы:', reply_markup=generate_block_resources_show(call.from_user.id, index_of_chat))
+        text = '✋ {member_name}, вы нарушаете наши правила! Запрещены любые ссылки!'
+        if db['settings'][index_of_chat]['block_resources']['warning'] != 'None': text = db['settings'][index_of_chat]['block_resources']['warning']
+        await bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id, text=f'⚙ Настройки чата (<a href="https://{group_id}.id">{group_id}</a>)\n\n<b>Блокировка ссылок на внешние ресурсы:</b>\n{text}', reply_markup=generate_block_resources_show(call.from_user.id, index_of_chat))
     except Exception as e:
         print(e)
 
@@ -280,15 +286,13 @@ async def react_to_block_repostes_show(call: CallbackQuery):
         group_id = "-" + re.sub(r"\D", "", group_id_url)
         db = collection.find_one({"user_id": call.from_user.id})
 
-        index_of_chat = 0
-        for index, item in enumerate(db['settings']):
-            if item.get("chat_id") == group_id:
-                index_of_chat = index
-                break
+        index_of_chat = get_dict_index(db, group_id)
         await call.answer()
-        await bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id, text=f'⚙ Настройки чата (<a href="https://{group_id}.id">{group_id}</a>)\n\nЗапрет репостов:', reply_markup=generate_block_repostes_show(call.from_user.id, index_of_chat))
+        text = '✋ {member_name}, вы нарушаете наши правила! Репосты запрещены!'
+        if db['settings'][index_of_chat]['block_repostes']['warning'] != 'None': text = db['settings'][index_of_chat]['block_repostes']['warning']
+        await bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id, text=f'⚙ Настройки чата (<a href="https://{group_id}.id">{group_id}</a>)\n\n<b>Запрет репостов:</b>\n{text}', reply_markup=generate_block_repostes_show(call.from_user.id, index_of_chat))
     except Exception as e:
-        print(e)\
+        print(e)
 
 
 @dp.callback_query_handler(lambda call: call.data == 'system_notice_show')
@@ -298,11 +302,7 @@ async def react_to_system_notice_show(call: CallbackQuery):
         group_id = "-" + re.sub(r"\D", "", group_id_url)
         db = collection.find_one({"user_id": call.from_user.id})
 
-        index_of_chat = 0
-        for index, item in enumerate(db['settings']):
-            if item.get("chat_id") == group_id:
-                index_of_chat = index
-                break
+        index_of_chat = get_dict_index(db, group_id)
         await call.answer()
         await bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id, text=f'⚙ Настройки чата (<a href="https://{group_id}.id">{group_id}</a>)\n\nАвто-удаление системных оповещение о подключении к чату нового пользователя или при покиданий пользователя:', reply_markup=generate_system_notice_show(call.from_user.id, index_of_chat))
     except Exception as e:
@@ -315,13 +315,11 @@ async def react_to_block_ping_show(call: CallbackQuery):
         group_id = "-" + re.sub(r"\D", "", group_id_url)
         db = collection.find_one({"user_id": call.from_user.id})
 
-        index_of_chat = 0
-        for index, item in enumerate(db['settings']):
-            if item.get("chat_id") == group_id:
-                index_of_chat = index
-                break
+        index_of_chat = get_dict_index(db, group_id)
         await call.answer()
-        await bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id, text=f'⚙ Настройки чата (<a href="https://{group_id}.id">{group_id}</a>)\n\nЗапрет пинга:', reply_markup=generate_block_ping_show(call.from_user.id, index_of_chat))
+        text = '✋ {member_name}, вы нарушаете наши правила! Пинг запрещен!'
+        if db['settings'][index_of_chat]['block_ping']['warning'] != 'None': text = db['settings'][index_of_chat]['block_ping']['warning']
+        await bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id, text=f'⚙ Настройки чата (<a href="https://{group_id}.id">{group_id}</a>)\n\n<b>Запрет пинга:</b>\n{text}', reply_markup=generate_block_ping_show(call.from_user.id, index_of_chat))
     except Exception as e:
         print(e)
 
@@ -332,11 +330,7 @@ async def react_to_activator(call: CallbackQuery):
         group_id = "-" + re.sub(r"\D", "", group_id_url)
         db = collection.find_one({"user_id": call.from_user.id})
 
-        index_of_chat = 0
-        for index, item in enumerate(db['settings']):
-            if item.get("chat_id") == group_id:
-                index_of_chat = index
-                break
+        index_of_chat = get_dict_index(db, group_id)
 
         call_data_identificator = call.data.split('_')[1]
 
@@ -388,11 +382,7 @@ async def show_blocked_resources(call: CallbackQuery):
         group_id = "-" + re.sub(r"\D", "", group_id_url)
         db = collection.find_one({"user_id": call.from_user.id})
 
-        index_of_chat = 0
-        for index, item in enumerate(db['settings']):
-            if item.get("chat_id") == group_id:
-                index_of_chat = index
-                break
+        index_of_chat = get_dict_index(db, group_id)
 
         await call.answer()
         await bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id,
@@ -426,11 +416,7 @@ async def react_to_back_to_block_resources(call: CallbackQuery):
         group_id = "-" + re.sub(r"\D", "", group_id_url)
         db = collection.find_one({"chats": str(group_id)})
 
-        index_of_chat = 0
-        for index, item in enumerate(db['settings']):
-            if item.get("chat_id") == group_id:
-                index_of_chat = index
-                break
+        index_of_chat = get_dict_index(db, group_id)
 
         await call.answer()
         await bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id,
@@ -452,6 +438,20 @@ async def show_profile(call: CallbackQuery):
         print(e)
 
 
+
+@dp.callback_query_handler(lambda call: call.data == 'back_to_my_profil')
+async def back_to_my_profil_reaction(call: CallbackQuery):
+    try:
+        await bot.delete_message(call.message.chat.id, call.message.message_id)
+        db = collection.find_one({"user_id": call.from_user.id})
+        lic = 'Лицензии нет'
+        if db['lic'] != 'None': lic = db['lic']
+        await bot.send_message(chat_id=call.message.chat.id,
+                                    text=f'👤 Ваш профиль:\n\n<b>Пользователь:</b> #{db["inlineid"]} - {db["register_data"]}\n<b>Username:</b> @{call.from_user.username}\n<b>Имя:</b> {call.from_user.first_name}\n<b>Чатов:</b> {len(db["chats"])}\n<b>Лицензий:</b> {db["lic"]}', reply_markup=generate_money_top_up())
+        await call.answer()
+    except Exception as e:
+        print(e)
+
 @dp.callback_query_handler(lambda call: call.data == 'back_to_main_page')
 async def show_profile(call: CallbackQuery):
     try:
@@ -466,7 +466,7 @@ async def show_my_chats(call: CallbackQuery):
     try:
         db = collection.find_one_and_update({"user_id": call.from_user.id}, {'$set': {"current_pg": 0}})
         if len(db['chats']) == 0:
-            await call.answer('У вас нет чатов :(', show_alert=True)
+            return await call.answer('У вас нет чатов :(', show_alert=True)
 
         await bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id, text='🛢️ Выберите чат для настройки:', reply_markup=await generate_my_chats(user_id=db["user_id"]))
         await call.answer()
@@ -503,6 +503,10 @@ async def react_to_prev_page(call: CallbackQuery):
 async def react_to_settings_chats(call: CallbackQuery):
     try:
         chat_id = call.data.split('_')[1]
+        db = collection.find_one({'chats': chat_id})
+        index_of_chat = get_dict_index(db, chat_id)
+        if db['settings'][index_of_chat]['lic'] == True: return await bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id, text=f'⚙ Настройки чата (<a href="https://{chat_id}.id">{chat_id}</a>):',
+                         reply_markup=generate_settings(True))
         await bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id, text=f'⚙ Настройки чата (<a href="https://{chat_id}.id">{chat_id}</a>):',
                          reply_markup=generate_settings())
         await call.answer()
@@ -510,6 +514,114 @@ async def react_to_settings_chats(call: CallbackQuery):
         print(e)
 
 
+
+@dp.callback_query_handler(lambda call: call.data == 'back_to_settings')
+async def react_to_back_to_settings(call: CallbackQuery):
+    await bot.delete_message(call.message.chat.id, call.message.message_id)
+    group_id_url = ''
+    if call.message.caption_entities: group_id_url = call.message.caption_entities[0].url
+    if call.message.entities: group_id_url = call.message.entities[0].url
+    group_id = "-" + re.sub(r"\D", "", group_id_url)
+    db = collection.find_one({"chats": group_id})
+    index_of_chat = get_dict_index(db, group_id)
+    if db['settings'][index_of_chat]['lic'] == True: return await bot.send_message(text=f'⚙ Настройки чата (<a href="https://{group_id}.id">{group_id}</a>):', chat_id=call.message.chat.id, reply_markup=generate_settings(lic=True))
+    await bot.send_message(text=f'⚙ Настройки чата (<a href="https://{group_id}.id">{group_id}</a>):', chat_id=call.message.chat.id, reply_markup=generate_settings())
+
+
 @dp.callback_query_handler(lambda call: call.data == 'money_top_up')
 async def react_to_money_top_up(call: CallbackQuery):
-    await bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id, text='Прайс-лист:\n30 дней - 30р\n90 дней - 90р\n180 дней - 180р\n365 дней - 350р')
+    try:
+        group_id_url = call.message.entities[0].url
+        group_id = "-" + re.sub(r"\D", "", group_id_url)
+        db = collection.find_one({"_id": ObjectId('64987b1eeed9918b13b0e8b4')})
+        prices = ''
+        unsortedp = db['price']
+        positions = sorted(unsortedp, key=lambda x: int(x['period']))
+        for i in positions:
+            prices += f'💎 {i["period"]} дней – {i["price"]}₽\n'
+        await bot.delete_message(chat_id=call.message.chat.id, message_id=call.message.message_id)
+        await bot.send_photo(chat_id=call.message.chat.id, photo=InputFile('./imgs/price.jpg'),
+                             caption=f'(<a href="https://{group_id}.id">{group_id}</a>) <b>Прайс-лист лицензий:</b>\n{prices}', reply_markup=generate_payment_page())
+    except Exception as e:
+        print(e)
+
+@dp.callback_query_handler(lambda call: 'buy' in call.data)
+async def react_to_buy(call: CallbackQuery):
+    try:
+        group_id_url = call.message.caption_entities[0].url
+        group_id = "-" + re.sub(r"\D", "", group_id_url)
+        await bot.delete_message(call.message.chat.id, call.message.message_id)
+        collection.find_one_and_update({"user_id": call.from_user.id}, {"$set": {"priceq": call.data.split('_')[1]}})
+        await bot.send_photo(chat_id=call.message.chat.id, photo=InputFile('./imgs/payment_method.jpg'),
+                             caption=f'(<a href="https://{group_id}.id">{group_id}</a>) <b>Выберите способ оплаты:</b>', reply_markup=generate_payment_method())
+    except Exception as e:
+        print(e)
+
+@dp.callback_query_handler(lambda call: call.data == 'lic_info')
+async def answer_to_lic_info(call: CallbackQuery):
+    group_id_url = call.message.entities[0].url
+    group_id = "-" + re.sub(r"\D", "", group_id_url)
+    db = collection.find_one({"chats": group_id})
+    index_of_chat = get_dict_index(db, group_id)
+    if db['settings'][index_of_chat]['lic'] == False:
+        await call.answer('ℹ У вас нет лицензии на данный чат или срок действия лицензии окончен', show_alert=True)
+        return await bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id, reply_markup=generate_settings())
+    await bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id, text=f'Информация о лицензии (<a href="https://{group_id}.id">{group_id}</a>):\n\n<b>Дата приобретения</b>: {db["settings"][index_of_chat]["lic_buyed_date"]}\n<b>Срок действия лицензии</b>: до {db["settings"][index_of_chat]["lic_end"][0]}\n<b>Приобретенный срок:</b> {db["settings"][index_of_chat]["lic_end"][2]} дней', reply_markup=generate_back_to_settings())
+
+# ОПЛАТА
+
+@dp.callback_query_handler(lambda call: 'pay' in call.data)
+async def react_to_pay(call: CallbackQuery):
+    try:
+        group_id_url = call.message.caption_entities[0].url
+        group_id = "-" + re.sub(r"\D", "", group_id_url)
+        chat = await bot.get_chat(group_id)
+        if call.data.split('_')[1] == 'yoomoney':
+            db = collection.find_one({"user_id": call.from_user.id})
+            admindb = collection.find_one({"_id": ObjectId('64987b1eeed9918b13b0e8b4')})
+            priceindex = get_price_index(db['priceq'])
+            amount = int(str(admindb['price'][priceindex]['price']).replace('.', '') + '0')
+            product = LabeledPrice(label='Product', amount=amount)
+
+            await bot.send_invoice(
+                chat_id=call.message.chat.id,
+                title=f'Лицензия на {db["priceq"]} дней | Л̶и̶м̶и̶т̶ы̶ ̶н̶а̶ ̶ч̶а̶т̶ - {chat.title}',
+                description='Купив лицензию, вы сможете избавиться от лимитов на чат',
+                payload=f"{db['priceq']}_{group_id}",
+                provider_token=config['PROVIDER'],
+                currency='RUB',
+                prices=[product],
+                start_parameter=call.from_user.id,
+                is_flexible=False,
+                protect_content=True,
+                photo_url='https://cdn.discordapp.com/attachments/992866546596712638/1131264970206744656/lic.jpg'
+            )
+            await call.answer()
+    except Exception as e:
+        print(e)
+
+@dp.pre_checkout_query_handler()
+async def process_pre_checkout_query(pre_checkout_query: PreCheckoutQuery):
+    trash = await bot.send_message(pre_checkout_query.from_user.id, '🔄️ Транскрипция...')
+    await bot.answer_pre_checkout_query(pre_checkout_query.id, ok=True, error_message='Произошла ошибка при подтверждении транскрипции ⚠')
+    await bot.delete_message(pre_checkout_query.from_user.id, trash.message_id)
+
+@dp.message_handler(content_types=ContentTypes.SUCCESSFUL_PAYMENT)
+async def process_successful_payment(ctx: Message):
+    db = collection.find_one({"user_id": ctx.from_user.id})
+    index_of_chat = get_dict_index(db, ctx.successful_payment.invoice_payload.split('_')[1])
+    adb = collection.find_one({"_id": ObjectId('64987b1eeed9918b13b0e8b4')})
+    liccount = db['lic'] + 1
+    liccountgeneral = adb['lics_buyed'] + 1
+    alics = adb['active_lic'] + 1
+    earnup = float(str(ctx.successful_payment.total_amount)[:-2] + "." + str(ctx.successful_payment.total_amount)[-2:])
+    earned = adb['earned'] + earnup
+    enddate = calculate_end_date(int(ctx.successful_payment.invoice_payload.split('_')[0]))
+    current_datetime = datetime.now(pytz.utc)
+    moscow_tz = pytz.timezone('Europe/Moscow')
+    current_datetime_moscow = current_datetime.astimezone(moscow_tz)
+    formatted_datetime = current_datetime_moscow.strftime("%H:%M %d.%m.%Y")
+    collection.find_one_and_update({"user_id": ctx.from_user.id}, {"$set": {"lic": liccount, f"settings.{index_of_chat}.lic": True, f"settings.{index_of_chat}.lic_end": [enddate[0], enddate[1], ctx.successful_payment.invoice_payload.split('_')[0]], f"settings.{index_of_chat}.lic_buyed_date": formatted_datetime}})
+    collection.find_one_and_update({"_id": ObjectId('64987b1eeed9918b13b0e8b4')}, {"$set": {"lics_buyed": liccountgeneral, "earned": earned, "active_lic": alics}, "$push": {"chat_with_lics": ctx.successful_payment.invoice_payload.split('_')[1]}})
+    await ctx.answer('😇 Свяжитесь с @GrSoul, если возникнут проблемы')
+    await ctx.reply_photo(photo=InputFile('./imgs/succsessful.jpg'), caption=f"Успешная оплата ✅\n\nИнформация о лицензии в настройках чата(<a href='https://{ctx.successful_payment.invoice_payload.split('_')[1]}.id'>{ctx.successful_payment.invoice_payload.split('_')[1]}</a>)", reply_markup=generate_back_to_settings())

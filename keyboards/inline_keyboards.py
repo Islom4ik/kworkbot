@@ -32,13 +32,17 @@ def generate_rules_keyboard():
     markup.add(rules_btn)
     return markup
 
-def generate_settings():
+def generate_settings(lic=False):
     markup = InlineKeyboardMarkup()
     edit_texts_btn = InlineKeyboardButton('✍ Изменение текста', callback_data='settings_texts')
     edit_admin_btn = InlineKeyboardButton('🧑‍⚖ Настройки администрирования', callback_data='settings_admins')
+    buy_lic_btn = InlineKeyboardButton('💎 Купить лицензию', callback_data='money_top_up')
+    lic_info_btn = InlineKeyboardButton('ℹ Информация о лицензии', callback_data='lic_info')
     done_btn = InlineKeyboardButton('✅ Готово', callback_data='done_btn')
-    markup.add(edit_texts_btn)
     markup.add(edit_admin_btn)
+    markup.add(edit_texts_btn)
+    if lic == False: markup.add(buy_lic_btn)
+    else: markup.add(lic_info_btn)
     markup.add(done_btn)
     return markup
 
@@ -46,23 +50,23 @@ def generate_edit_text_settings():
     markup = InlineKeyboardMarkup()
     texts_greeting_btn = InlineKeyboardButton('👋 Приветствие нового участника', callback_data='texts_greeting')
     show_rules = InlineKeyboardButton('🪧 Правила чата', callback_data='show_rules')
-    warning_btn = InlineKeyboardButton('👮 Уведомление при нарушений', callback_data='show_warning')
-    afk_btn = InlineKeyboardButton('🔇 Если в чате никто не пишет __', callback_data='show_afk')
+    warning_btn = InlineKeyboardButton('👮 Патруль', callback_data='show_warning')
+    # afk_btn = InlineKeyboardButton('🔇 Если в чате никто не пишет __', callback_data='show_afk')
+    format_btn = InlineKeyboardButton('💬 Форматирование', callback_data='formating')
     back_btn = InlineKeyboardButton('⏪ Назад', callback_data='back_to_chose')
     markup.add(texts_greeting_btn)
     markup.add(show_rules)
+    # markup.add(afk_btn)
     markup.add(warning_btn)
-    markup.add(afk_btn)
+    markup.add(format_btn)
     markup.add(back_btn)
     return markup
 
 def generate_text_editing_page():
     markup = InlineKeyboardMarkup()
     edit_greeting_btn = InlineKeyboardButton('✍ Изменить текст приветствия', callback_data='edit_greeting')
-    format_btn = InlineKeyboardButton('💬 Форматирование', callback_data='formating')
     back_btn = InlineKeyboardButton('⏪ Назад', callback_data='back_to_show_page')
     markup.add(edit_greeting_btn)
-    markup.add(format_btn)
     markup.add(back_btn)
     return markup
 
@@ -76,9 +80,15 @@ def generate_rules_editing_page():
 
 def generate_warning_editing_page():
     markup = InlineKeyboardMarkup()
-    edit_warning_btn = InlineKeyboardButton('✍ Изменить текст предупреждения', callback_data='edit_warning')
+    edit_banwarning_btn = InlineKeyboardButton('📝 Команда: /ban', callback_data='edit_banwarning')
+    edit_kickwarning_btn = InlineKeyboardButton('📝 Команда: /kick', callback_data='edit_kickwarning')
+    edit_unbantext_btn = InlineKeyboardButton('📝 Команда: /unban', callback_data='edit_unbantext')
+    format_btn = InlineKeyboardButton('💬 Форматирование', callback_data='formating')
     back_btn = InlineKeyboardButton('⏪ Назад', callback_data='back_to_show_page')
-    markup.add(edit_warning_btn)
+    markup.add(edit_banwarning_btn)
+    markup.add(edit_kickwarning_btn)
+    markup.add(edit_unbantext_btn)
+    markup.add(format_btn)
     markup.add(back_btn)
     return markup
 
@@ -93,14 +103,19 @@ def generate_afk_editing_page():
 def generate_admins_settings():
     markup = InlineKeyboardMarkup()
     block_resources_show_btn = InlineKeyboardButton('🌐 Блокировка ссылок на внешние ресурсы', callback_data='block_resources_show')
+    system_notice_show_btn = InlineKeyboardButton('📢 Авто-удаление системных оповещений',
+                                                  callback_data='system_notice_show')
     block_repostes_show_btn = InlineKeyboardButton('📩 Запрет репостов', callback_data='block_repostes_show')
     block_ping_show_btn = InlineKeyboardButton('🔕 Запрет пинга', callback_data='block_ping_show')
-    system_notice_show_btn = InlineKeyboardButton('📢 Авто-удаление системных оповещений', callback_data='system_notice_show')
+    format_btn = InlineKeyboardButton('💬 Форматирование', callback_data='formating')
+
+
     back_btn = InlineKeyboardButton('⏪ Назад', callback_data='back_to_chose')
     markup.add(block_resources_show_btn)
     markup.add(block_repostes_show_btn)
     markup.add(block_ping_show_btn)
     markup.add(system_notice_show_btn)
+    markup.add(format_btn)
     markup.add(back_btn)
     return markup
 
@@ -113,9 +128,11 @@ def generate_block_resources_show(user_id, chat_index):
 
     activate_btn = InlineKeyboardButton(status, callback_data='activator_resources')
     blocked_resources_btn = InlineKeyboardButton('📃 Список запрещеных ресурсов', callback_data='blocked_resources')
+    edit_resourcesw_btn = InlineKeyboardButton('📝 Изменить текст нарушения', callback_data='edit_resourcesw')
     back_btn = InlineKeyboardButton('⏪ Назад', callback_data='back_to_admin_page')
     markup.add(activate_btn)
     markup.add(blocked_resources_btn)
+    markup.add(edit_resourcesw_btn)
     markup.add(back_btn)
     return markup
 
@@ -129,8 +146,10 @@ def generate_block_repostes_show(user_id, chat_index):
         status = '🟢 | Активированно '
 
     activate_btn = InlineKeyboardButton(status, callback_data='activator_repostes')
+    edit_repostesw_btn = InlineKeyboardButton('📝 Изменить текст нарушения', callback_data='edit_repostesw')
     back_btn = InlineKeyboardButton('⏪ Назад', callback_data='back_to_admin_page')
     markup.add(activate_btn)
+    markup.add(edit_repostesw_btn)
     markup.add(back_btn)
     return markup
 
@@ -156,8 +175,10 @@ def generate_block_ping_show(user_id, chat_index):
         status = '🟢 | Активированно '
 
     activate_btn = InlineKeyboardButton(status, callback_data='activator_ping')
+    edit_pingw_btn = InlineKeyboardButton('📝 Изменить текст нарушения', callback_data='edit_pingw')
     back_btn = InlineKeyboardButton('⏪ Назад', callback_data='back_to_admin_page')
     markup.add(activate_btn)
+    markup.add(edit_pingw_btn)
     markup.add(back_btn)
     return markup
 
@@ -238,4 +259,92 @@ def generate_admin_return():
     markup = InlineKeyboardMarkup()
     admin_stats_back_btn = InlineKeyboardButton('⏪ Назад', callback_data='admin_stats_back')
     markup.add(admin_stats_back_btn)
+    return markup
+
+def generate_admin_return_main():
+    markup = InlineKeyboardMarkup()
+    admin_stats_back_btn = InlineKeyboardButton('⏪ Назад в админку', callback_data='back_from_added_position')
+    markup.add(admin_stats_back_btn)
+    return markup
+
+
+def generate_payment_page():
+    markup = InlineKeyboardMarkup(row_width=1)
+    db = collection.find_one({"_id": ObjectId('64987b1eeed9918b13b0e8b4')})
+    unsortedp = db['price']
+    positions = sorted(unsortedp, key=lambda x: int(x['period']))
+    btns = []
+    for i in positions:
+        btns.append(InlineKeyboardButton(f'🛒 Купить - {i["period"]} дней', callback_data=f'buy_{i["period"]}'))
+    back_btn = InlineKeyboardButton('⏪ Назад в настройки', callback_data='back_to_settings')
+    markup.add(*btns)
+    markup.add(back_btn)
+    return markup
+
+def generate_delete_positions():
+    markup = InlineKeyboardMarkup(row_width=1)
+    db = collection.find_one({"_id": ObjectId('64987b1eeed9918b13b0e8b4')})
+    unsortedp = db['price']
+    positions = sorted(unsortedp, key=lambda x: int(x['period']))
+    btns = []
+    for i in positions:
+        btns.append(InlineKeyboardButton(f'🗑️ {i["period"]} дней - {i["price"]}₽', callback_data=f'positdelete_{i["period"]}'))
+    back_btn = InlineKeyboardButton('⏪ Назад', callback_data='back_to_edit_price')
+    markup.add(*btns)
+    markup.add(back_btn)
+    return markup
+
+def generate_eidit_positions():
+    markup = InlineKeyboardMarkup(row_width=1)
+    db = collection.find_one({"_id": ObjectId('64987b1eeed9918b13b0e8b4')})
+    unsortedp = db['price']
+    positions = sorted(unsortedp, key=lambda x: int(x['period']))
+    btns = []
+    for i in positions:
+        btns.append(InlineKeyboardButton(f'📝 {i["period"]} дней - {i["price"]}₽', callback_data=f'positedite_{i["period"]}'))
+    back_btn = InlineKeyboardButton('⏪ Назад', callback_data='back_to_edit_price')
+    markup.add(*btns)
+    markup.add(back_btn)
+    return markup
+
+def generate_payment_method():
+    markup = InlineKeyboardMarkup()
+    manual_btn = InlineKeyboardButton('💳 Ручной перевод', callback_data='pay_manual')
+    yoomoney_btn = InlineKeyboardButton('💳 ЮMoney', callback_data='pay_yoomoney')
+    back_btn = InlineKeyboardButton('⏪ Назад в настройки', callback_data='back_to_settings')
+    markup.add(manual_btn)
+    markup.add(yoomoney_btn)
+    markup.add(back_btn)
+    return markup
+
+def generate_back_to_settings():
+    markup = InlineKeyboardMarkup()
+    back_btn = InlineKeyboardButton('⏪ Назад в настройки', callback_data='back_to_settings')
+    markup.add(back_btn)
+    return markup
+
+def generate_back_to_profil():
+    markup = InlineKeyboardMarkup()
+    back_btn = InlineKeyboardButton('⏪ Открыть профиль', callback_data='back_to_my_profil')
+    markup.add(back_btn)
+    return markup
+
+def generate_admin_limit_edit_choice():
+    markup = InlineKeyboardMarkup()
+    limit_to_users_edit_btn = InlineKeyboardButton('📝 Лимит пользователей на чат', callback_data='aedit_limittousers')
+    back_btn = InlineKeyboardButton('⏪ Назад', callback_data='back_from_edit_limits')
+    markup.add(limit_to_users_edit_btn)
+    markup.add(back_btn)
+    return markup
+
+def generate_admin_price_edit_choice():
+    markup = InlineKeyboardMarkup()
+    admin_addposition_btn = InlineKeyboardButton('➕ Добавить новую позицию', callback_data='admin_addposition')
+    admin_editposition_btn = InlineKeyboardButton('✍ Изменить существующую позицию', callback_data='admin_editposition')
+    admin_deleteposition_btn = InlineKeyboardButton('🗑️ Удалить позицию', callback_data='admin_deleteposition')
+    back_btn = InlineKeyboardButton('⏪ Назад', callback_data='back_from_edit_limits')
+    markup.add(admin_addposition_btn)
+    markup.add(admin_editposition_btn)
+    markup.add(admin_deleteposition_btn)
+    markup.add(back_btn)
     return markup
