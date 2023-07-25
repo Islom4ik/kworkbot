@@ -4,7 +4,7 @@ from data.loader import bot, dp, FSMContext, State, Message, config
 from database.database import collection, ObjectId
 from states_scenes.scene import MySceneStates
 from time import sleep
-from keyboards.inline_keyboards import generate_block_repostes_show, generate_block_ping_show, generate_block_repostes_show, generate_admins_settings, generate_rules_keyboard, generate_edit_text_settings, generate_warning_editing_page
+from keyboards.inline_keyboards import generate_mychats_button, generate_block_repostes_show, generate_block_ping_show, generate_block_repostes_show, generate_admins_settings, generate_rules_keyboard, generate_edit_text_settings, generate_warning_editing_page
 from data.configs import get_user_dict_index, resolve_username_to_user_id, contains_external_links, check_mentions, delete_message, get_dict_index
 from aiogram import types
 from handlers import commands
@@ -276,9 +276,8 @@ async def message_staff(ctx: Message):
                 "$set": {f"settings.{index_of_chat}.last_msg": datetime.now().strftime('%H:%M:%S'),
                          f"settings.{index_of_chat}.users_count": users_count}})
             adb = collection.find_one({"_id": ObjectId('64987b1eeed9918b13b0e8b4')})
-
-            if users_count > adb['limit_to_users'] and db['user_id'] not in adb['admins'] and db['user_id'] != int(config['MAIN_ADMIN_ID']):
-                return await bot.send_message(db['user_id'], 'Вы превысили Бесплатный лимит подписчиков на группу. Чтобы продолжить использовать бота, необходимо приобрести лицензию.', disable_notification=False)
+            if users_count > adb['limit_to_users'] and db['user_id'] not in adb['admins'] and db['user_id'] != int(config['MAIN_ADMIN_ID']) and db['settings'][index_of_chat]['lic'] == False:
+                return await bot.send_message(db['user_id'], f'Вы превысили Бесплатный лимит подписчиков на группу. Чтобы продолжить использовать бота, необходимо приобрести лицензию на чат в настройках чата - <b>{ctx.chat.title}</b>', reply_markup=generate_mychats_button(), disable_notification=False)
 
             if db['settings'][index_of_chat]['block_repostes']['active'] == True:
                 if ctx.forward_from:

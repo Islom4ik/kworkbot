@@ -1,12 +1,11 @@
 from data.loader import bot, dp, FSMContext, State, Message, config
 from data.configs import delete_message, resolve_username_to_user_id
-from aiogram.types import InputFile, CallbackQuery, ContentTypes, InputMediaPhoto
+from aiogram.types import CallbackQuery, ContentTypes
 from database.database import collection, ObjectId
 from states_scenes.scene import MySceneStates
-from keyboards.inline_keyboards import generate_eidit_positions, generate_admin_return_main, generate_delete_positions, generate_admin_price_edit_choice, generate_admin_limit_edit_choice, generate_admin_main_page, generate_add_button, generate_admin_return
+from keyboards.inline_keyboards import generate_positedit, generate_eidit_positions, generate_admin_return_main, generate_delete_positions, generate_admin_price_edit_choice, generate_admin_limit_edit_choice, generate_admin_main_page, generate_add_button, generate_admin_return
 import asyncio
 import re
-import psutil
 
 @dp.message_handler(commands=['admin'])
 async def react_to_admin(ctx: Message):
@@ -14,7 +13,7 @@ async def react_to_admin(ctx: Message):
         await ctx.delete()
         db = collection.find_one({'_id': ObjectId('64987b1eeed9918b13b0e8b4')})
         if ctx.from_user.id not in db['admins'] and ctx.from_user.id != int(config['MAIN_ADMIN_ID']): return await ctx.answer('🔒')
-        await ctx.answer_photo(InputFile('admin/admin_page.jpg'), f'Добро пожаловать в админку, <a href="tg://user?id={ctx.from_user.id}">{ctx.from_user.first_name}</a>', reply_markup=generate_admin_main_page())
+        await ctx.answer(f'Добро пожаловать в админку, <a href="tg://user?id={ctx.from_user.id}">{ctx.from_user.first_name}</a>', reply_markup=generate_admin_main_page())
     except Exception as e:
         print(e)
 
@@ -51,11 +50,8 @@ async def answer_to_admin_post(call: CallbackQuery):
 async def answer_to_admin_stats(call: CallbackQuery):
     try:
         db = collection.find_one({'_id': ObjectId('64987b1eeed9918b13b0e8b4')})
-        cpu_percent = psutil.cpu_percent(percpu=True)
-        net_stats = psutil.net_io_counters()
-        memory_stats = psutil.virtual_memory()
         await call.answer()
-        await bot.edit_message_media(InputMediaPhoto(InputFile('admin/admin_stats.jpg'), caption=f'📊 Общая статистика бота:\n\n<b>Кол-во пользователей:</b> {len(db["users"])}\n<b>Кол-во чатов с ботом:</b> {len(db["groups"])}\n<b>Кол-во купленных лицензий за все время:</b> {db["lics_buyed"]}\n<b>Кол-во заработанных денег за все время:</b> {db["earned"]}₽\n<b>Кол-во чатов с лицензией:</b> {len(db["chat_with_lics"])}\n\n<b>Статистика VPS:</b>\n\n<b>Оперативка:</b>\nИспользуется оперативной памяти: {memory_stats.used} байт\nПроцент использования оперативной памяти: {memory_stats.percent}%\n\n<b>Сеть:</b>\nВходящий трафик: {net_stats.bytes_recv} байт\nИсходящий трафик: {net_stats.bytes_sent} байт\n\n<b>Процессор:</b>\nПроцент использования ядра 1: {cpu_percent[0]}%\nПроцент использования ядра 2: {cpu_percent[1]}%'), call.message.chat.id, call.message.message_id, reply_markup=generate_admin_return())
+        await bot.edit_message_text(text=f'📊 Общая статистика бота:\n\n<b>Кол-во пользователей:</b> {len(db["users"])}\n<b>Кол-во чатов с ботом:</b> {len(db["groups"])}\n<b>Кол-во купленных лицензий за все время:</b> {db["lics_buyed"]}\n<b>Кол-во заработанных денег за все время:</b> {db["earned"]}₽\n<b>Кол-во чатов с лицензией:</b> {len(db["chat_with_lics"])}', chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=generate_admin_return())
     except Exception as e:
         print(e)
 
@@ -64,7 +60,7 @@ async def answer_to_admin_stats(call: CallbackQuery):
 async def answer_to_admin_back(call: CallbackQuery):
     try:
         await call.answer()
-        await bot.edit_message_media(InputMediaPhoto(InputFile('admin/admin_page.jpg'), caption=f'Добро пожаловать в админку, <a href="tg://user?id={call.from_user.id}">{call.from_user.first_name}</a>') , call.message.chat.id, call.message.message_id, reply_markup=generate_admin_main_page())
+        await bot.edit_message_text(text=f'Добро пожаловать в админку, <a href="tg://user?id={call.from_user.id}">{call.from_user.first_name}</a>', chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=generate_admin_main_page())
     except Exception as e:
         print(e)
 
@@ -78,8 +74,8 @@ async def answer_to_admin_emoney(call: CallbackQuery):
         positions = sorted(unsortedp, key=lambda x: int(x['period']))
         for i in positions:
             prices += f'🔹 {i["period"]} дней – {i["price"]}₽\n'
-        await bot.edit_message_caption(chat_id=call.message.chat.id, message_id=call.message.message_id,
-                                       caption=f'💎 <b>Прайс-лист:</b>\n{prices}\nВыберите действие:',
+        await bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id,
+                                       text=f'💎 <b>Прайс-лист:</b>\n{prices}\nВыберите действие:',
                                        reply_markup=generate_admin_price_edit_choice())
     except Exception as e:
         print(e)
@@ -88,7 +84,7 @@ async def answer_to_admin_emoney(call: CallbackQuery):
 async def answer_to_admin_elimits(call: CallbackQuery):
     try:
         db = collection.find_one({"_id": ObjectId('64987b1eeed9918b13b0e8b4')})
-        await bot.edit_message_caption(chat_id=call.message.chat.id, message_id=call.message.message_id, caption=f'✋ <b>Лимиты:</b>\n<b>Лимит количества пользователей на чат:</b> {db["limit_to_users"]}\n\nВыберите лимит который хотите изменить:', reply_markup=generate_admin_limit_edit_choice())
+        await bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id, text=f'✋ <b>Лимиты:</b>\n<b>Лимит количества пользователей на чат:</b> {db["limit_to_users"]}\n\nВыберите лимит который хотите изменить:', reply_markup=generate_admin_limit_edit_choice())
     except Exception as e:
         print(e)
 
@@ -100,7 +96,7 @@ async def answer_to_admin_deleteposition(call: CallbackQuery):
     try:
         db = collection.find_one({"_id": ObjectId('64987b1eeed9918b13b0e8b4')})
         if len(db['price']) == 0: return await bot.send_message(call.message.chat.id, call.message.message_id, text='⚠ Извините, но я не нашел ни одну позицию в базе данных')
-        await bot.edit_message_caption(chat_id=call.message.chat.id, message_id=call.message.message_id, caption=f'⬇ <b>Выберите позицию которую хотите удалить:</b>', reply_markup=generate_delete_positions())
+        await bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id, text=f'⬇ <b>Выберите позицию которую хотите удалить:</b>', reply_markup=generate_delete_positions())
     except Exception as e:
         print(e)
 
@@ -116,9 +112,91 @@ async def answer_to_admin_admin_addposition(call: CallbackQuery):
 @dp.callback_query_handler(lambda call: call.data == 'admin_editposition')
 async def answer_to_admin_admin_editposition(call: CallbackQuery):
     try:
-        return await call.answer('😶 Пока не доступно', show_alert=True)
+        await bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id, text='⬇ Выберите позицию которую хотите изменить:', reply_markup=generate_eidit_positions())
+    except Exception as e:
+        print(e)
+
+@dp.callback_query_handler(lambda call: 'positedite' in call.data)
+async def answer_to_admin_positedite(call: CallbackQuery):
+    try:
         await bot.delete_message(call.message.chat.id, call.message.message_id)
-        await bot.edit_message_caption(chat_id=call.message.chat.id, message_id=call.message.message_id, caption='⬇ Выберите позицию которую хотите изменить:', reply_markup=generate_eidit_positions())
+        db = collection.find_one({"_id": ObjectId('64987b1eeed9918b13b0e8b4')})
+        index_of_possition = None
+        for index, item in enumerate(db['price']):
+            if item.get("period") == call.data.split("_")[1]:
+                index_of_possition = index
+                break
+        await bot.send_message(chat_id=call.message.chat.id, text=f'⬇ Выберите то, что бы вы хотели изменить в этой позиции:\n\n<b>{db["price"][index_of_possition]["period"]}</b> дней - <b>{db["price"][index_of_possition]["price"]}</b>₽', reply_markup=generate_positedit())
+        collection.find_one_and_update({"_id": ObjectId('64987b1eeed9918b13b0e8b4')},
+                                          {"$set": {"positindx": index_of_possition, "positeddays": 'None', "positedprice": 'None'}})
+    except Exception as e:
+        print(e)
+
+@dp.callback_query_handler(lambda call: call.data == 'posited_days')
+async def answer_to_admin_posited_days(call: CallbackQuery):
+    try:
+        await bot.delete_message(call.message.chat.id, call.message.message_id)
+        await MySceneStates.posited_days_scene.set()
+        await bot.send_message(call.message.chat.id, text='✍ Введите срок действия лицензии в днях:')
+    except Exception as e:
+        print(e)
+
+@dp.callback_query_handler(lambda call: call.data == 'posited_price')
+async def answer_to_admin_posited_price(call: CallbackQuery):
+    try:
+        await bot.delete_message(call.message.chat.id, call.message.message_id)
+        await MySceneStates.posited_price_scene.set()
+        await bot.send_message(call.message.chat.id, text='✍ Введите сумму которую заплатит пользователь при покупке(Значение должно быть в десятичном-float формате. Пример: 100.0 | 250.0):')
+    except Exception as e:
+        print(e)
+
+@dp.callback_query_handler(lambda call: call.data == 'posited_cancel')
+async def answer_to_admin_posited_cancel(call: CallbackQuery):
+    try:
+        db = collection.find_one({"_id": ObjectId('64987b1eeed9918b13b0e8b4')})
+        prices = ''
+        unsortedp = db['price']
+        positions = sorted(unsortedp, key=lambda x: int(x['period']))
+        for i in positions:
+            prices += f'🔹 {i["period"]} дней – {i["price"]}₽\n'
+        await bot.delete_message(call.message.chat.id, call.message.message_id)
+        await bot.send_message(chat_id=call.message.chat.id,
+                             text=f'💎 <b>Прайс-лист:</b>\n{prices}\nВыберите действие:',
+                             reply_markup=generate_admin_price_edit_choice())
+    except Exception as e:
+        print(e)
+
+@dp.callback_query_handler(lambda call: call.data == 'posited_accept')
+async def answer_to_admin_posited_accept(call: CallbackQuery):
+    try:
+        db = collection.find_one({"_id": ObjectId('64987b1eeed9918b13b0e8b4')})
+        if db['positeddays'] == "None" and db['positedprice'] == "None": return await call.answer('Вы ещё ничего не изменили 😶',
+                                                                              show_alert=True)
+        if db['positeddays'] != 'None': collection.find_one_and_update({"_id": ObjectId('64987b1eeed9918b13b0e8b4')}, {
+            "$set": {f'price.{db["positindx"]}.period': db['positeddays']}})
+        if db['positedprice'] != 'None': collection.find_one_and_update({"_id": ObjectId('64987b1eeed9918b13b0e8b4')}, {
+            "$set": {f'price.{db["positindx"]}.price': db['positedprice']}})
+        await call.answer('Успешное изменение ✅')
+        db = collection.find_one({"_id": ObjectId('64987b1eeed9918b13b0e8b4')})
+        prices = ''
+        unsortedp = db['price']
+        positions = sorted(unsortedp, key=lambda x: int(x['period']))
+        for i in positions:
+            prices += f'🔹 {i["period"]} дней – {i["price"]}₽\n'
+        await bot.delete_message(call.message.chat.id, call.message.message_id)
+        await bot.send_message(chat_id=call.message.chat.id,
+                             text=f'💎 <b>Прайс-лист:</b>\n{prices}\nВыберите действие:',
+                             reply_markup=generate_admin_price_edit_choice())
+    except Exception as e:
+        print(e)
+
+
+@dp.callback_query_handler(lambda call: call.data == 'aedit_limittousers')
+async def answer_to_admin_aedit_limittousers(call: CallbackQuery):
+    try:
+        await bot.delete_message(call.message.chat.id, call.message.message_id)
+        await MySceneStates.aedit_limittousers_scene.set()
+        await bot.send_message(call.message.chat.id, text='✍ Введите лимит пользователей на чаты, в которых отсутсвует лицензия:')
     except Exception as e:
         print(e)
 
@@ -150,8 +228,8 @@ async def answer_to_admin_back_to_edit_price(call: CallbackQuery):
     for i in positions:
         prices += f'🔹 {i["period"]} дней – {i["price"]}₽\n'
     await call.answer()
-    await bot.edit_message_caption(chat_id=call.message.chat.id, message_id=call.message.message_id,
-                                   caption=f'💎 <b>Прайс-лист:</b>\n{prices}\nВыберите действие:',
+    await bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id,
+                                   text=f'💎 <b>Прайс-лист:</b>\n{prices}\nВыберите действие:',
                                    reply_markup=generate_admin_price_edit_choice())
 
 @dp.callback_query_handler(lambda call: call.data == 'back_from_added_position')
@@ -160,8 +238,8 @@ async def answer_to_admin_back_from_added_position(call: CallbackQuery):
     db = collection.find_one({'_id': ObjectId('64987b1eeed9918b13b0e8b4')})
     if call.from_user.id not in db['admins'] and call.from_user.id != int(
         config['MAIN_ADMIN_ID']): return await call.answer('🔒')
-    await bot.send_photo(chat_id=call.message.chat.id, photo=InputFile('admin/admin_page.jpg'),
-                           caption=f'Добро пожаловать в админку, <a href="tg://user?id={call.from_user.id}">{call.from_user.first_name}</a>',
+    await bot.send_message(chat_id=call.message.chat.id,
+                           text=f'Добро пожаловать в админку, <a href="tg://user?id={call.from_user.id}">{call.from_user.first_name}</a>',
                            reply_markup=generate_admin_main_page())
 
 @dp.message_handler(content_types=['text'], state=MySceneStates.add_admin)
@@ -179,6 +257,10 @@ async def add_admin_scene(ctx: Message, state: FSMContext):
             usern = re.findall(pattern, user)[0]
             userid = await resolve_username_to_user_id(usern)
             dicts_with_user_key.append(userid[0])
+        else:
+            await ctx.answer('👮 Введите юзернейм пользователя через @ или прямую ссылку на пользователя:')
+            await state.finish()
+            return await MySceneStates.add_admin.set()
 
         if len(dicts_with_user_key) == 0:
             trash = await ctx.answer('🪪 Пользователь не найден')
@@ -194,6 +276,78 @@ async def add_admin_scene(ctx: Message, state: FSMContext):
         await ctx.answer('✅ Вы успешно выдали доступ к админке!')
         await state.finish()
         await react_to_admin(ctx)
+    except Exception as e:
+        if e.args[0] == "'NoneType' object is not subscriptable":
+            await ctx.answer('Пользователь не найден 🤷‍♂')
+            await ctx.answer(text=f'Добро пожаловать в админку, <a href="tg://user?id={ctx.from_user.id}">{ctx.from_user.first_name}</a>',
+                                   reply_markup=generate_admin_main_page())
+
+@dp.message_handler(content_types=['text'], state=MySceneStates.aedit_limittousers_scene)
+async def aedit_limittousers_scene(ctx: Message, state: FSMContext):
+    try:
+        text = ctx.text
+        if text.isdigit() == False or (len(text) >= 2 and text[0] == '0'): return await ctx.answer('✋ Значение должно быть целым числом, введите ещё раз:')
+        toint = int(ctx.text)
+        collection.find_one_and_update({'_id': ObjectId('64987b1eeed9918b13b0e8b4')}, {"$set": {"limit_to_users": toint}})
+        await ctx.answer('Успешное изменение ✅')
+        await state.finish()
+        db = collection.find_one({'_id': ObjectId('64987b1eeed9918b13b0e8b4')})
+        await ctx.answer(text=f'✋ <b>Лимиты:</b>\n<b>Лимит количества пользователей на чат:</b> {db["limit_to_users"]}\n\nВыберите лимит который хотите изменить:', reply_markup=generate_admin_limit_edit_choice())
+    except Exception as e:
+        print(e)
+
+@dp.message_handler(content_types=['text'], state=MySceneStates.posited_days_scene)
+async def posited_days_scene(ctx: Message, state: FSMContext):
+    try:
+        text = ctx.text.replace('d', '').replace('д', '').replace('дней', '')
+        if text.isdigit() == False:
+            await state.finish()
+            await MySceneStates.posited_days_scene.set()
+            return await ctx.answer('✋ Значение должно быть числом\n\nВведите срок действия лицензии в днях:')
+
+        db = collection.find_one({'_id': ObjectId('64987b1eeed9918b13b0e8b4')})
+        check = None
+        for index, item in enumerate(db['price']):
+            if item.get("period") == text:
+                check = index
+                break
+
+        if check != None:
+            await ctx.answer('✋ В базе уже существует такая позиция с таким количеством дней\n\nВведите другое количество срока:')
+            await state.finish()
+            return await MySceneStates.posited_days_scene.set()
+        collection.find_one_and_update({'_id': ObjectId('64987b1eeed9918b13b0e8b4')}, {"$set": {"positeddays": text}})
+        db = collection.find_one({'_id': ObjectId('64987b1eeed9918b13b0e8b4')})
+        await state.finish()
+        if db["positedprice"] == 'None': return await ctx.answer(text=f'⬇ Выберите то, что бы вы хотели изменить в этой позиции:\n\n<b>{db["positeddays"]}</b> дней - <b>{db["price"][db["positindx"]]["price"]}</b>₽',
+                               reply_markup=generate_positedit())
+        await ctx.answer(text=f'⬇ Выберите то, что бы вы хотели изменить в этой позиции:\n\n<b>{db["positeddays"]}</b> дней - <b>{db["positedprice"]}</b>₽',
+                               reply_markup=generate_positedit())
+    except Exception as e:
+        print(e)
+
+@dp.message_handler(content_types=['text'], state=MySceneStates.posited_price_scene)
+async def posited_price_scene(ctx: Message, state: FSMContext):
+    try:
+        trahstext = ctx.text.replace('₽', '').replace('р', '').replace('рублей', '')
+        text = remove_non_digits_and_dot(trahstext)
+        check = has_decimal_point(text)
+        if check == False:
+            await ctx.answer(
+                '✋ Вы ввели значение в неправильном формате\n\nВведите сумму которую заплатит пользователь при покупке(Значение должно быть в десятичном-float формате. Пример: 100.0 | 250.0):')
+            await state.finish()
+            return await MySceneStates.posited_price_scene.set()
+
+        text_to_float = float(text)
+
+        collection.find_one_and_update({'_id': ObjectId('64987b1eeed9918b13b0e8b4')},
+                                       {"$set": {'positedprice': text_to_float}})
+        await state.finish()
+        db = collection.find_one({'_id': ObjectId('64987b1eeed9918b13b0e8b4')})
+        if db["positeddays"] == 'None': return await ctx.answer(text=f'⬇ Выберите то, что бы вы хотели изменить в этой позиции:\n\n<b>{db["price"][db["positindx"]]["period"]}</b> дней - <b>{db["positedprice"]}</b>₽',
+                               reply_markup=generate_positedit())
+        await ctx.answer(text=f'⬇ Выберите то, что бы вы хотели изменить в этой позиции:\n\n<b>{db["positeddays"]}</b> дней - <b>{db["positedprice"]}</b>₽',
+            reply_markup=generate_positedit())
     except Exception as e:
         print(e)
 
@@ -260,18 +414,20 @@ async def post_scene(ctx: Message, state: FSMContext):
         msgidtoedit = await ctx.answer('🔄️ Ваше сообщение рассылается по всем пользователям')
         asyncio.create_task(message_to_users(ctx, db['users'], msgidtoedit.message_id))
         await state.finish()
-        await react_to_admin(ctx)
+        await ctx.answer(text=f'Добро пожаловать в админку, <a href="tg://user?id={ctx.from_user.id}">{ctx.from_user.first_name}</a>',
+                               reply_markup=generate_admin_main_page())
     except Exception as e:
         print(e)
 
-async def message_to_users(ctx: Message, users: list, id):
+async def message_to_users(ctx, users: list, id):
     try:
         for i in users:
             try:
+                if i == ctx.chat.id: continue
                 await bot.copy_message(i, from_chat_id=ctx.chat.id, message_id=ctx.message_id)
+                await asyncio.sleep(0.4)
             except:
-                print('')
-            await asyncio.sleep(0.3)
+                print('msg_t_users - user blocked the bot')
         await bot.edit_message_text('Отправка завершена ✅', ctx.chat.id, id)
     except Exception as e:
         print(e)

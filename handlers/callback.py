@@ -4,7 +4,7 @@ import asyncio
 from data.loader import bot, dp, FSMContext, State, config
 from database.database import collection, ObjectId
 from states_scenes.scene import MySceneStates
-from aiogram.types import CallbackQuery, InputFile, ContentTypes, LabeledPrice, PreCheckoutQuery, Message
+from aiogram.types import CallbackQuery, ContentTypes, LabeledPrice, PreCheckoutQuery, Message
 from data.configs import calculate_end_date, get_price_index, done_message, delete_message, get_dict_index
 from keyboards.inline_keyboards import generate_back_to_settings, generate_back_to_profil, generate_payment_method, generate_payment_page, generate_my_chats, generate_add_b_resources, generate_admin_main_page, generate_back_to_main, generate_system_notice_show, generate_add_button, generate_settings_button, generate_edit_text_settings, generate_settings, generate_text_editing_page, generate_rules_editing_page, generate_warning_editing_page, generate_afk_editing_page, generate_admins_settings, generate_block_repostes_show, generate_block_ping_show, generate_block_resources_show, generate_money_top_up
 import re
@@ -55,7 +55,7 @@ async def change_to_edit_page(call: CallbackQuery):
 
 @dp.callback_query_handler(lambda call: call.data == 'back_from_edit_limits')
 async def answer_to_back_from_edits(call: CallbackQuery):
-    await bot.edit_message_caption(chat_id=call.message.chat.id, message_id=call.message.message_id, caption=f'Добро пожаловать в админку, <a href="tg://user?id={call.from_user.id}">{call.from_user.first_name}</a>', reply_markup=generate_admin_main_page())
+    await bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id, text=f'Добро пожаловать в админку, <a href="tg://user?id={call.from_user.id}">{call.from_user.first_name}</a>', reply_markup=generate_admin_main_page())
 
 @dp.callback_query_handler(lambda call: call.data == 'back_to_chose')
 async def react_to_back(call: CallbackQuery):
@@ -519,7 +519,6 @@ async def react_to_settings_chats(call: CallbackQuery):
 async def react_to_back_to_settings(call: CallbackQuery):
     await bot.delete_message(call.message.chat.id, call.message.message_id)
     group_id_url = ''
-    if call.message.caption_entities: group_id_url = call.message.caption_entities[0].url
     if call.message.entities: group_id_url = call.message.entities[0].url
     group_id = "-" + re.sub(r"\D", "", group_id_url)
     db = collection.find_one({"chats": group_id})
@@ -540,20 +539,19 @@ async def react_to_money_top_up(call: CallbackQuery):
         for i in positions:
             prices += f'💎 {i["period"]} дней – {i["price"]}₽\n'
         await bot.delete_message(chat_id=call.message.chat.id, message_id=call.message.message_id)
-        await bot.send_photo(chat_id=call.message.chat.id, photo=InputFile('./imgs/price.jpg'),
-                             caption=f'(<a href="https://{group_id}.id">{group_id}</a>) <b>Прайс-лист лицензий:</b>\n{prices}', reply_markup=generate_payment_page())
+        await bot.send_message(chat_id=call.message.chat.id,
+                             text=f'(<a href="https://{group_id}.id">{group_id}</a>) <b>Прайс-лист лицензий:</b>\n{prices}', reply_markup=generate_payment_page())
     except Exception as e:
         print(e)
 
 @dp.callback_query_handler(lambda call: 'buy' in call.data)
 async def react_to_buy(call: CallbackQuery):
     try:
-        group_id_url = call.message.caption_entities[0].url
+        group_id_url = call.message.entities[0].url
         group_id = "-" + re.sub(r"\D", "", group_id_url)
         await bot.delete_message(call.message.chat.id, call.message.message_id)
         collection.find_one_and_update({"user_id": call.from_user.id}, {"$set": {"priceq": call.data.split('_')[1]}})
-        await bot.send_photo(chat_id=call.message.chat.id, photo=InputFile('./imgs/payment_method.jpg'),
-                             caption=f'(<a href="https://{group_id}.id">{group_id}</a>) <b>Выберите способ оплаты:</b>', reply_markup=generate_payment_method())
+        await bot.send_message(chat_id=call.message.chat.id, text=f'(<a href="https://{group_id}.id">{group_id}</a>) <b>Выберите способ оплаты:</b>', reply_markup=generate_payment_method())
     except Exception as e:
         print(e)
 
@@ -573,7 +571,7 @@ async def answer_to_lic_info(call: CallbackQuery):
 @dp.callback_query_handler(lambda call: 'pay' in call.data)
 async def react_to_pay(call: CallbackQuery):
     try:
-        group_id_url = call.message.caption_entities[0].url
+        group_id_url = call.message.entities[0].url
         group_id = "-" + re.sub(r"\D", "", group_id_url)
         chat = await bot.get_chat(group_id)
         if call.data.split('_')[1] == 'yoomoney':
@@ -582,7 +580,7 @@ async def react_to_pay(call: CallbackQuery):
             priceindex = get_price_index(db['priceq'])
             amount = int(str(admindb['price'][priceindex]['price']).replace('.', '') + '0')
             product = LabeledPrice(label='Product', amount=amount)
-
+            await bot.delete_message(call.message.chat.id, call.message.message_id)
             await bot.send_invoice(
                 chat_id=call.message.chat.id,
                 title=f'Лицензия на {db["priceq"]} дней | Л̶и̶м̶и̶т̶ы̶ ̶н̶а̶ ̶ч̶а̶т̶ - {chat.title}',
@@ -597,6 +595,15 @@ async def react_to_pay(call: CallbackQuery):
                 photo_url='https://cdn.discordapp.com/attachments/992866546596712638/1131264970206744656/lic.jpg'
             )
             await call.answer()
+
+        else:
+            return call.answer('Не доступно 😶')
+            db = collection.find_one({"user_id": call.from_user.id})
+            admindb = collection.find_one({"_id": ObjectId('64987b1eeed9918b13b0e8b4')})
+            priceindex = get_price_index(db['priceq'])
+            amount = admindb['price'][priceindex]['price']
+            await bot.delete_message(call.message.chat.id, call.message.message_id)
+            await bot.send_message(call.message.chat.id, text=f'Переведите <b>{amount}₽</b> на указанные реквизиты 👇\n\n')
     except Exception as e:
         print(e)
 
@@ -624,4 +631,4 @@ async def process_successful_payment(ctx: Message):
     collection.find_one_and_update({"user_id": ctx.from_user.id}, {"$set": {"lic": liccount, f"settings.{index_of_chat}.lic": True, f"settings.{index_of_chat}.lic_end": [enddate[0], enddate[1], ctx.successful_payment.invoice_payload.split('_')[0]], f"settings.{index_of_chat}.lic_buyed_date": formatted_datetime}})
     collection.find_one_and_update({"_id": ObjectId('64987b1eeed9918b13b0e8b4')}, {"$set": {"lics_buyed": liccountgeneral, "earned": earned, "active_lic": alics}, "$push": {"chat_with_lics": ctx.successful_payment.invoice_payload.split('_')[1]}})
     await ctx.answer('😇 Свяжитесь с @GrSoul, если возникнут проблемы')
-    await ctx.reply_photo(photo=InputFile('./imgs/succsessful.jpg'), caption=f"Успешная оплата ✅\n\nИнформация о лицензии в настройках чата(<a href='https://{ctx.successful_payment.invoice_payload.split('_')[1]}.id'>{ctx.successful_payment.invoice_payload.split('_')[1]}</a>)", reply_markup=generate_back_to_settings())
+    await ctx.answer(text=f"Успешная оплата ✅\n\nИнформация о лицензии в настройках чата(<a href='https://{ctx.successful_payment.invoice_payload.split('_')[1]}.id'>{ctx.successful_payment.invoice_payload.split('_')[1]}</a>)", reply_markup=generate_back_to_settings())

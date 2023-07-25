@@ -13,6 +13,12 @@ def generate_add_button():
     markup.add(my_groups_btn)
     return markup
 
+def generate_mychats_button():
+    markup = InlineKeyboardMarkup()
+    my_groups_btn = InlineKeyboardButton('🗃️ Мои чаты', callback_data='show_my_chats')
+    markup.add(my_groups_btn)
+    return markup
+
 
 def generate_settings_button(chat_id):
     markup = InlineKeyboardMarkup()
@@ -347,4 +353,16 @@ def generate_admin_price_edit_choice():
     markup.add(admin_editposition_btn)
     markup.add(admin_deleteposition_btn)
     markup.add(back_btn)
+    return markup
+
+def generate_positedit():
+    markup = InlineKeyboardMarkup()
+    edit_days = InlineKeyboardButton('🔹 Изменить срок', callback_data='posited_days')
+    edit_price = InlineKeyboardButton('🔹 Изменить цену', callback_data='posited_price')
+    cancel_editing = InlineKeyboardButton('🔴 Отменить изменение', callback_data='posited_cancel')
+    accept_editing = InlineKeyboardButton('🟢 Применить изменения', callback_data='posited_accept')
+    markup.add(edit_days)
+    markup.add(edit_price)
+    markup.add(cancel_editing)
+    markup.add(accept_editing)
     return markup

@@ -18,3 +18,6 @@ class MySceneStates(StatesGroup):
     pingw_change_scene = State()
     addposition_period_scene = State()
     addposition_price_scene = State()
+    posited_days_scene = State()
+    posited_price_scene = State()
+    aedit_limittousers_scene = State()
