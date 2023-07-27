@@ -1,7 +1,6 @@
 # Активатор всех модулей и всего кода
-from data.loader import dp, executor
+from data.loader import dp, executor, bot
 import handlers
-
 
 if __name__ == '__main__':
     executor.start_polling(dp, skip_updates=True)

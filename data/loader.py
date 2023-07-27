@@ -4,6 +4,7 @@ from aiogram.types import Message
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters.state import State, StatesGroup
+from aiogram.dispatcher.webhook import get_new_configured_app
 from dotenv import dotenv_values
 from pyrogram import Client, enums
 from pyrogram.raw.functions.contacts import ResolveUsername

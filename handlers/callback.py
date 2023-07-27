@@ -6,7 +6,7 @@ from database.database import collection, ObjectId
 from states_scenes.scene import MySceneStates
 from aiogram.types import CallbackQuery, ContentTypes, LabeledPrice, PreCheckoutQuery, Message
 from data.configs import calculate_end_date, get_price_index, done_message, delete_message, get_dict_index
-from keyboards.inline_keyboards import generate_back_to_settings, generate_back_to_profil, generate_payment_method, generate_payment_page, generate_my_chats, generate_add_b_resources, generate_admin_main_page, generate_back_to_main, generate_system_notice_show, generate_add_button, generate_settings_button, generate_edit_text_settings, generate_settings, generate_text_editing_page, generate_rules_editing_page, generate_warning_editing_page, generate_afk_editing_page, generate_admins_settings, generate_block_repostes_show, generate_block_ping_show, generate_block_resources_show, generate_money_top_up
+from keyboards.inline_keyboards import generate_manual_payment, generate_back_to_settings, generate_back_to_profil, generate_payment_method, generate_payment_page, generate_my_chats, generate_add_b_resources, generate_admin_main_page, generate_back_to_main, generate_system_notice_show, generate_add_button, generate_settings_button, generate_edit_text_settings, generate_settings, generate_text_editing_page, generate_rules_editing_page, generate_warning_editing_page, generate_afk_editing_page, generate_admins_settings, generate_block_repostes_show, generate_block_ping_show, generate_block_resources_show, generate_money_top_up
 import re
 from datetime import datetime
 import pytz
@@ -517,14 +517,12 @@ async def react_to_settings_chats(call: CallbackQuery):
 
 @dp.callback_query_handler(lambda call: call.data == 'back_to_settings')
 async def react_to_back_to_settings(call: CallbackQuery):
-    await bot.delete_message(call.message.chat.id, call.message.message_id)
-    group_id_url = ''
-    if call.message.entities: group_id_url = call.message.entities[0].url
+    group_id_url = call.message.entities[0].url
     group_id = "-" + re.sub(r"\D", "", group_id_url)
     db = collection.find_one({"chats": group_id})
     index_of_chat = get_dict_index(db, group_id)
-    if db['settings'][index_of_chat]['lic'] == True: return await bot.send_message(text=f'⚙ Настройки чата (<a href="https://{group_id}.id">{group_id}</a>):', chat_id=call.message.chat.id, reply_markup=generate_settings(lic=True))
-    await bot.send_message(text=f'⚙ Настройки чата (<a href="https://{group_id}.id">{group_id}</a>):', chat_id=call.message.chat.id, reply_markup=generate_settings())
+    if db['settings'][index_of_chat]['lic'] == True: return await bot.edit_message_text(text=f'⚙ Настройки чата (<a href="https://{group_id}.id">{group_id}</a>):', message_id=call.message.message_id, chat_id=call.message.chat.id, reply_markup=generate_settings(lic=True))
+    await bot.edit_message_text(text=f'⚙ Настройки чата (<a href="https://{group_id}.id">{group_id}</a>):', message_id=call.message.message_id, chat_id=call.message.chat.id, reply_markup=generate_settings())
 
 
 @dp.callback_query_handler(lambda call: call.data == 'money_top_up')
@@ -549,9 +547,8 @@ async def react_to_buy(call: CallbackQuery):
     try:
         group_id_url = call.message.entities[0].url
         group_id = "-" + re.sub(r"\D", "", group_id_url)
-        await bot.delete_message(call.message.chat.id, call.message.message_id)
         collection.find_one_and_update({"user_id": call.from_user.id}, {"$set": {"priceq": call.data.split('_')[1]}})
-        await bot.send_message(chat_id=call.message.chat.id, text=f'(<a href="https://{group_id}.id">{group_id}</a>) <b>Выберите способ оплаты:</b>', reply_markup=generate_payment_method())
+        await bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id, text=f'(<a href="https://{group_id}.id">{group_id}</a>) <b>Выберите способ оплаты:</b>', reply_markup=generate_payment_method())
     except Exception as e:
         print(e)
 
@@ -575,6 +572,7 @@ async def react_to_pay(call: CallbackQuery):
         group_id = "-" + re.sub(r"\D", "", group_id_url)
         chat = await bot.get_chat(group_id)
         if call.data.split('_')[1] == 'yoomoney':
+            return await call.answer('Тут будет оплата invoke')
             db = collection.find_one({"user_id": call.from_user.id})
             admindb = collection.find_one({"_id": ObjectId('64987b1eeed9918b13b0e8b4')})
             priceindex = get_price_index(db['priceq'])
@@ -595,15 +593,38 @@ async def react_to_pay(call: CallbackQuery):
                 photo_url='https://cdn.discordapp.com/attachments/992866546596712638/1131264970206744656/lic.jpg'
             )
             await call.answer()
-
         else:
-            return call.answer('Не доступно 😶')
+            return await call.answer('Пока не доступно 😶')
             db = collection.find_one({"user_id": call.from_user.id})
             admindb = collection.find_one({"_id": ObjectId('64987b1eeed9918b13b0e8b4')})
             priceindex = get_price_index(db['priceq'])
             amount = admindb['price'][priceindex]['price']
             await bot.delete_message(call.message.chat.id, call.message.message_id)
-            await bot.send_message(call.message.chat.id, text=f'Переведите <b>{amount}₽</b> на указанные реквизиты 👇\n\n')
+            manual_comentidc = admindb['manual_comentid'] + 1
+            await bot.send_message(call.message.chat.id, text=f'(<a href="https://{group_id}.id">{group_id}</a>) Ручная оплата:\n\nПереведите <b>{amount}₽</b> на указанные реквизиты 👇\n\n<b>{config["TYPE"]}</b>\n<code>{config["CARD_NUMBER"]}</code>\n<b>{config["CARD_OWNER"]}</b>\n\n❗ В КОМЕНТАРИЯХ УКАЖИТЕ НОМЕР: #{manual_comentidc}\n\nПосле перевода нажмите на кнопку "Я перевел"', reply_markup=generate_manual_payment())
+            collection.find_one_and_update({"_id": ObjectId('64987b1eeed9918b13b0e8b4')}, {"$set": {"manual_comentid": manual_comentidc}})
+            collection.find_one_and_update({"user_id": call.from_user.id}, {"$set": {"manual_codeid": manual_comentidc}})
+    except Exception as e:
+        print(e)
+
+@dp.callback_query_handler(lambda call: 'manualp' in call.data)
+async def answer_to_manualp(call: CallbackQuery):
+    try:
+        group_id_url = call.message.entities[0].url
+        group_id = "-" + re.sub(r"\D", "", group_id_url)
+        if call.data.split('_')[1] == 'back':
+            db = collection.find_one({"_id": ObjectId('64987b1eeed9918b13b0e8b4')})
+            prices = ''
+            unsortedp = db['price']
+            positions = sorted(unsortedp, key=lambda x: int(x['period']))
+            for i in positions:
+                prices += f'💎 {i["period"]} дней – {i["price"]}₽\n'
+            await bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id,
+                                        text=f'(<a href="https://{group_id}.id">{group_id}</a>) <b>Прайс-лист лицензий:</b>\n{prices}',
+                                        reply_markup=generate_payment_page())
+        else:
+            db = collection.find_one({"user_id": call.from_user.id})
+            await bot.send_message(chat_id=config['MAIN_ADMIN_ID'], text=f'💸 Новый запрос на проверку ручной оплаты:\n\nЛицензия для чата: <a href="https://{group_id}.id">{group_id}</a>\nКод который должен быть в коментариях: {db["manual_codeid"]}\nПользователь: <a href="https://t.me/{call.from_user.username}">{call.from_user.first_name}</b>', disable_web_page_preview=True, disable_notification=False)
     except Exception as e:
         print(e)
 

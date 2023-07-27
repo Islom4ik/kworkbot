@@ -366,3 +366,11 @@ def generate_positedit():
     markup.add(cancel_editing)
     markup.add(accept_editing)
     return markup
+
+def generate_manual_payment():
+    markup = InlineKeyboardMarkup()
+    manualp_sendtoacc = InlineKeyboardButton('✅ Я перевел', callback_data='manualp_sendtoacc')
+    manualp_back = InlineKeyboardButton('⏪ Назад', callback_data='manualp_back')
+    markup.add(manualp_sendtoacc)
+    markup.add(manualp_back)
+    return markup
