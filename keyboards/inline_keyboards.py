@@ -108,8 +108,8 @@ def generate_afk_editing_page():
 
 def generate_admins_settings():
     markup = InlineKeyboardMarkup()
-    block_resources_show_btn = InlineKeyboardButton('🌐 Блокировка ссылок на внешние ресурсы', callback_data='block_resources_show')
-    system_notice_show_btn = InlineKeyboardButton('📢 Авто-удаление системных оповещений',
+    block_resources_show_btn = InlineKeyboardButton('🌐 Блок внешних ссылок', callback_data='block_resources_show')
+    system_notice_show_btn = InlineKeyboardButton('📢 Удаление оповещений',
                                                   callback_data='system_notice_show')
     block_repostes_show_btn = InlineKeyboardButton('📩 Запрет репостов', callback_data='block_repostes_show')
     block_ping_show_btn = InlineKeyboardButton('🔕 Запрет пинга', callback_data='block_ping_show')
@@ -117,12 +117,9 @@ def generate_admins_settings():
 
 
     back_btn = InlineKeyboardButton('⏪ Назад', callback_data='back_to_chose')
-    markup.add(block_resources_show_btn)
-    markup.add(block_repostes_show_btn)
-    markup.add(block_ping_show_btn)
-    markup.add(system_notice_show_btn)
-    markup.add(format_btn)
-    markup.add(back_btn)
+    markup.add(block_resources_show_btn, system_notice_show_btn)
+    markup.add(block_repostes_show_btn, format_btn)
+    markup.add(block_ping_show_btn, back_btn)
     return markup
 
 def generate_block_resources_show(user_id, chat_index):
@@ -133,8 +130,8 @@ def generate_block_resources_show(user_id, chat_index):
         status = '🟢 | Активированно '
 
     activate_btn = InlineKeyboardButton(status, callback_data='activator_resources')
-    blocked_resources_btn = InlineKeyboardButton('📃 Список запрещеных ресурсов', callback_data='blocked_resources')
-    edit_resourcesw_btn = InlineKeyboardButton('📝 Изменить текст нарушения', callback_data='edit_resourcesw')
+    blocked_resources_btn = InlineKeyboardButton('📋 Список ресурсов', callback_data='blocked_resources')
+    edit_resourcesw_btn = InlineKeyboardButton('📝 Изменить текст', callback_data='edit_resourcesw')
     back_btn = InlineKeyboardButton('⏪ Назад', callback_data='back_to_admin_page')
     markup.add(activate_btn)
     markup.add(blocked_resources_btn)
@@ -204,8 +201,8 @@ def generate_back_to_main():
 
 def generate_add_b_resources():
     markup = InlineKeyboardMarkup()
-    add_btn = InlineKeyboardButton('➕ Расширить список', callback_data='add_block_resources')
-    delete_btn = InlineKeyboardButton('🗑️ Удалить расширение', callback_data='remove_block_resources')
+    add_btn = InlineKeyboardButton('➕ Добавить запрет', callback_data='add_block_resources')
+    delete_btn = InlineKeyboardButton('🗑️ Удалить', callback_data='remove_block_resources')
     back_btn = InlineKeyboardButton('⏪ Назад', callback_data='back_to_block_resources')
     markup.add(add_btn)
     markup.add(delete_btn)

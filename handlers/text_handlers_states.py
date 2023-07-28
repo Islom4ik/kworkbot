@@ -4,12 +4,13 @@ from data.loader import bot, dp, FSMContext, State, Message, config
 from database.database import collection, ObjectId
 from states_scenes.scene import MySceneStates
 from time import sleep
-from keyboards.inline_keyboards import generate_mychats_button, generate_block_repostes_show, generate_block_ping_show, generate_block_repostes_show, generate_admins_settings, generate_rules_keyboard, generate_edit_text_settings, generate_warning_editing_page
-from data.configs import get_user_dict_index, resolve_username_to_user_id, contains_external_links, check_mentions, delete_message, get_dict_index
+from keyboards.inline_keyboards import *
+from data.configs import *
 from aiogram import types
 from handlers import commands
 from admin import admin
 from datetime import datetime
+from data.texts import *
 
 
 @dp.message_handler(content_types=[types.ContentType.NEW_CHAT_MEMBERS])
@@ -52,18 +53,18 @@ async def left_chat_member(ctx: Message):
     except Exception as e:
         print(e)
 
-
 @dp.message_handler(content_types=['text'], state=MySceneStates.greeting_change_text_scene)
 async def greeting_scene(ctx: Message, state: FSMContext):
     try:
         db = collection.find_one({"user_id": ctx.from_user.id})
         group_id = db['chat_editing']
         index_of_chat = get_dict_index(db, group_id)
-        collection.find_one_and_update({"user_id": ctx.from_user.id}, {"$set": {f"settings.{index_of_chat}.greeting": ctx.text}})
+        collection.find_one_and_update({"user_id": ctx.from_user.id}, {"$set": {f"settings.{index_of_chat}.greeting": ctx.text, f"settings.{index_of_chat}.updated_date": get_msk_unix()}})
+        db = collection.find_one({"user_id": ctx.from_user.id})
         await bot.send_message(ctx.chat.id, text=f'Успешное изменение ✅')
         await state.finish()
         sleep(2)
-        await bot.send_message(ctx.chat.id, text=f'⚙ Настройки чата (<a href="https://{group_id}.id">{group_id}</a>)\n\nВыберите текст, который хотите посмотреть:',
+        await bot.send_message(ctx.chat.id, text=f'{t_settings.format(group_id=group_id, bot_user=t_bot_user, upd_time=update_time(db["settings"][index_of_chat]["updated_date"]))}\n\nВыберите текст, который хотите посмотреть:',
                                     reply_markup=generate_edit_text_settings())
     except Exception as e:
         print(e)
@@ -74,11 +75,12 @@ async def rules_scene(ctx: Message, state: FSMContext):
         db = collection.find_one({"user_id": ctx.from_user.id})
         group_id = db['chat_editing']
         index_of_chat = get_dict_index(db, group_id)
-        collection.find_one_and_update({"user_id": ctx.from_user.id}, {"$set": {f"settings.{index_of_chat}.rules": ctx.text}})
+        collection.find_one_and_update({"user_id": ctx.from_user.id}, {"$set": {f"settings.{index_of_chat}.rules": ctx.text, f"settings.{index_of_chat}.updated_date": get_msk_unix()}})
+        db = collection.find_one({"user_id": ctx.from_user.id})
         await bot.send_message(ctx.chat.id, text=f'Успешное изменение ✅')
         await state.finish()
         sleep(2)
-        await bot.send_message(ctx.chat.id, text=f'⚙ Настройки чата (<a href="https://{group_id}.id">{group_id}</a>)\n\nВыберите текст, который хотите посмотреть:',
+        await bot.send_message(ctx.chat.id, text=f'{t_settings.format(group_id=group_id, bot_user=t_bot_user, upd_time=update_time(db["settings"][index_of_chat]["updated_date"]))}\n\nВыберите текст, который хотите посмотреть:',
                                     reply_markup=generate_edit_text_settings())
     except Exception as e:
         print(e)
@@ -89,11 +91,12 @@ async def afk_scene(ctx: Message, state: FSMContext):
         db = collection.find_one({"user_id": ctx.from_user.id})
         group_id = db['chat_editing']
         index_of_chat = get_dict_index(db, group_id)
-        collection.find_one_and_update({"user_id": ctx.from_user.id}, {"$set": {f"settings.{index_of_chat}.afk": ctx.text}})
+        collection.find_one_and_update({"user_id": ctx.from_user.id}, {"$set": {f"settings.{index_of_chat}.afk": ctx.text, f"settings.{index_of_chat}.updated_date": get_msk_unix()}})
+        db = collection.find_one({"user_id": ctx.from_user.id})
         await bot.send_message(ctx.chat.id, text=f'Успешное изменение ✅')
         await state.finish()
         sleep(2)
-        await bot.send_message(ctx.chat.id, text=f'⚙ Настройки чата (<a href="https://{group_id}.id">{group_id}</a>)\n\nВыберите текст, который хотите посмотреть:',
+        await bot.send_message(ctx.chat.id, text=f'{t_settings.format(group_id=group_id, bot_user=t_bot_user, upd_time=update_time(db["settings"][index_of_chat]["updated_date"]))}\n\nВыберите текст, который хотите посмотреть:',
                                     reply_markup=generate_edit_text_settings())
     except Exception as e:
         print(e)
@@ -111,14 +114,14 @@ async def blocked_resources_add_scene(ctx: Message, state: FSMContext):
         for i in domains_array:
             try:
                 collection.find_one_and_update({"user_id": ctx.from_user.id},
-                                               {'$push': {f'settings.{index_of_chat}.block_resources.r_list': i}})
+                                               {'$push': {f'settings.{index_of_chat}.block_resources.r_list': i}, '$set': {f"settings.{index_of_chat}.updated_date": get_msk_unix()}})
             except Exception as e:
                 print(e)
-
+        db = collection.find_one({"user_id": ctx.from_user.id})
         await bot.send_message(ctx.chat.id, text=f'Успешное изменение ✅')
         await state.finish()
         await asyncio.sleep(2)
-        await bot.send_message(ctx.chat.id, text=f'⚙ Настройки чата (<a href="https://{group_id}.id">{group_id}</a>)\n\nВыберите функцию:', reply_markup=generate_admins_settings())
+        await bot.send_message(ctx.chat.id, text=f'{t_settings.format(group_id=group_id, bot_user=t_bot_user, upd_time=update_time(db["settings"][index_of_chat]["updated_date"]))}\n\nЗаблокированные ресурсы:\n<b>{", ".join(db["settings"][index_of_chat]["block_resources"]["r_list"])}</b>', reply_markup=generate_add_b_resources())
     except Exception as e:
         print(e)
 
@@ -133,14 +136,14 @@ async def blocked_resources_remove_scene(ctx: Message, state: FSMContext):
         for i in domains_array:
             try:
                 collection.find_one_and_update({"user_id": ctx.from_user.id},
-                                               {'$pull': {f'settings.{index_of_chat}.block_resources.r_list': i}})
+                                               {'$pull': {f'settings.{index_of_chat}.block_resources.r_list': i}, "$set": {f"settings.{index_of_chat}.updated_date": get_msk_unix()}})
             except Exception as e:
                 print(e)
-
+        db = collection.find_one({"user_id": ctx.from_user.id})
         await bot.send_message(ctx.chat.id, text=f'Успешное изменение ✅')
         await state.finish()
         await asyncio.sleep(2)
-        await bot.send_message(ctx.chat.id, text=f'⚙ Настройки чата (<a href="https://{group_id}.id">{group_id}</a>)\n\nВыберите функцию:', reply_markup=generate_admins_settings())
+        await bot.send_message(ctx.chat.id, text=f'{t_settings.format(group_id=group_id, bot_user=t_bot_user, upd_time=update_time(db["settings"][index_of_chat]["updated_date"]))}\n\nЗаблокированные ресурсы:\n<b>{", ".join(db["settings"][index_of_chat]["block_resources"]["r_list"])}</b>', reply_markup=generate_add_b_resources())
     except Exception as e:
         print(e)
 
@@ -152,14 +155,13 @@ async def banwarning_change_text(ctx: Message, state: FSMContext):
         index_of_chat = get_dict_index(db, group_id)
 
         collection.find_one_and_update({"user_id": ctx.from_user.id},
-                                       {'$set': {f'settings.{index_of_chat}.warning_ban': ctx.text}})
-
+                                       {'$set': {f'settings.{index_of_chat}.warning_ban': ctx.text, f"settings.{index_of_chat}.updated_date": get_msk_unix()}})
         await bot.send_message(ctx.chat.id, text=f'Успешное изменение ✅')
         db = collection.find_one({"user_id": ctx.from_user.id})
         await state.finish()
         await asyncio.sleep(2)
         await bot.send_message(chat_id=ctx.chat.id,
-                               text=f'⚙ Настройки чата (<a href="https://{group_id}.id">{group_id}</a>)\n<b>Сообщения о бане | кике | разбане\nНажмите на одну из кнопок, чтобы изменить сообщение о:</b>\n\n<b>BAN:</b>\n{db["settings"][index_of_chat]["warning_ban"]}\n\n<b>KICK:</b>\n{db["settings"][index_of_chat]["warning_kick"]}\n\n<b>UNBAN:</b>\n{db["settings"][index_of_chat]["unban_text"]}',
+                               text=f'{t_settings.format(group_id=group_id, bot_user=t_bot_user, upd_time=update_time(db["settings"][index_of_chat]["updated_date"]))}\n<b>Сообщения о бане | кике | разбане\nНажмите на одну из кнопок, чтобы изменить сообщение о:</b>\n\n<b>BAN:</b>\n{db["settings"][index_of_chat]["warning_ban"]}\n\n<b>KICK:</b>\n{db["settings"][index_of_chat]["warning_kick"]}\n\n<b>UNBAN:</b>\n{db["settings"][index_of_chat]["unban_text"]}',
                                reply_markup=generate_warning_editing_page())
     except Exception as e:
         print(e)
@@ -172,14 +174,13 @@ async def kickwarning_change_text(ctx: Message, state: FSMContext):
         index_of_chat = get_dict_index(db, group_id)
 
         collection.find_one_and_update({"user_id": ctx.from_user.id},
-                                       {'$set': {f'settings.{index_of_chat}.warning_kick': ctx.text}})
-
+                                       {'$set': {f'settings.{index_of_chat}.warning_kick': ctx.text, f"settings.{index_of_chat}.updated_date": get_msk_unix()}})
         await bot.send_message(ctx.chat.id, text=f'Успешное изменение ✅')
         db = collection.find_one({"user_id": ctx.from_user.id})
         await state.finish()
         await asyncio.sleep(2)
         await bot.send_message(chat_id=ctx.chat.id,
-                               text=f'⚙ Настройки чата (<a href="https://{group_id}.id">{group_id}</a>)\n<b>Сообщения о бане | кике | разбане\nНажмите на одну из кнопок, чтобы изменить сообщение о:</b>\n\n<b>BAN:</b>\n{db["settings"][index_of_chat]["warning_ban"]}\n\n<b>KICK:</b>\n{db["settings"][index_of_chat]["warning_kick"]}\n\n<b>UNBAN:</b>\n{db["settings"][index_of_chat]["unban_text"]}',
+                               text=f'{t_settings.format(group_id=group_id, bot_user=t_bot_user, upd_time=update_time(db["settings"][index_of_chat]["updated_date"]))}\n<b>Сообщения о бане | кике | разбане\nНажмите на одну из кнопок, чтобы изменить сообщение о:</b>\n\n<b>BAN:</b>\n{db["settings"][index_of_chat]["warning_ban"]}\n\n<b>KICK:</b>\n{db["settings"][index_of_chat]["warning_kick"]}\n\n<b>UNBAN:</b>\n{db["settings"][index_of_chat]["unban_text"]}',
                                reply_markup=generate_warning_editing_page())
     except Exception as e:
         print(e)
@@ -192,14 +193,13 @@ async def unban_change_text(ctx: Message, state: FSMContext):
         index_of_chat = get_dict_index(db, group_id)
 
         collection.find_one_and_update({"user_id": ctx.from_user.id},
-                                       {'$set': {f'settings.{index_of_chat}.unban_text': ctx.text}})
-
+                                       {'$set': {f'settings.{index_of_chat}.unban_text': ctx.text, f"settings.{index_of_chat}.updated_date": get_msk_unix()}})
         await bot.send_message(ctx.chat.id, text=f'Успешное изменение ✅')
         db = collection.find_one({"user_id": ctx.from_user.id})
         await state.finish()
         await asyncio.sleep(2)
         await bot.send_message(chat_id=ctx.chat.id,
-                               text=f'⚙ Настройки чата (<a href="https://{group_id}.id">{group_id}</a>)\n<b>Сообщения о бане | кике | разбане\nНажмите на одну из кнопок, чтобы изменить сообщение о:</b>\n\n<b>BAN:</b>\n{db["settings"][index_of_chat]["warning_ban"]}\n\n<b>KICK:</b>\n{db["settings"][index_of_chat]["warning_kick"]}\n\n<b>UNBAN:</b>\n{db["settings"][index_of_chat]["unban_text"]}',
+                               text=f'{t_settings.format(group_id=group_id, bot_user=t_bot_user, upd_time=update_time(db["settings"][index_of_chat]["updated_date"]))}\n<b>Сообщения о бане | кике | разбане\nНажмите на одну из кнопок, чтобы изменить сообщение о:</b>\n\n<b>BAN:</b>\n{db["settings"][index_of_chat]["warning_ban"]}\n\n<b>KICK:</b>\n{db["settings"][index_of_chat]["warning_kick"]}\n\n<b>UNBAN:</b>\n{db["settings"][index_of_chat]["unban_text"]}',
                                reply_markup=generate_warning_editing_page())
     except Exception as e:
         print(e)
@@ -213,14 +213,14 @@ async def resourcesw_change_text(ctx: Message, state: FSMContext):
         index_of_chat = get_dict_index(db, group_id)
 
         collection.find_one_and_update({"user_id": ctx.from_user.id},
-                                       {'$set': {f'settings.{index_of_chat}.block_resources.warning': ctx.text}})
-
+                                       {'$set': {f'settings.{index_of_chat}.block_resources.warning': ctx.text, f"settings.{index_of_chat}.updated_date": get_msk_unix()}})
+        db = collection.find_one({"user_id": ctx.from_user.id})
         await bot.send_message(ctx.chat.id, text=f'Успешное изменение ✅')
         await state.finish()
         await asyncio.sleep(2)
         await bot.send_message(chat_id=ctx.chat.id,
-                                    text=f'⚙ Настройки чата (<a href="https://{group_id}.id">{group_id}</a>)\n\n<b>Блокировка ссылок на внешние ресурсы:</b>\n{ctx.text}',
-                                    reply_markup=generate_block_repostes_show(ctx.from_user.id, index_of_chat))
+                                    text=f'{t_settings.format(group_id=group_id, bot_user=t_bot_user, upd_time=update_time(db["settings"][index_of_chat]["updated_date"]))}\n\n<b>Сообщение при нарушении:</b>\n{ctx.text}',
+                                    reply_markup=generate_block_resources_show(ctx.from_user.id, index_of_chat))
     except Exception as e:
         print(e)
 
@@ -232,13 +232,13 @@ async def repostesw_change_text(ctx: Message, state: FSMContext):
         index_of_chat = get_dict_index(db, group_id)
 
         collection.find_one_and_update({"user_id": ctx.from_user.id},
-                                       {'$set': {f'settings.{index_of_chat}.block_repostes.warning': ctx.text}})
-
+                                       {'$set': {f'settings.{index_of_chat}.block_repostes.warning': ctx.text, f"settings.{index_of_chat}.updated_date": get_msk_unix()}})
+        db = collection.find_one({"user_id": ctx.from_user.id})
         await bot.send_message(ctx.chat.id, text=f'Успешное изменение ✅')
         await state.finish()
         await asyncio.sleep(2)
         await bot.send_message(chat_id=ctx.chat.id,
-                                    text=f'⚙ Настройки чата (<a href="https://{group_id}.id">{group_id}</a>)\n\n<b>Запрет репостов:</b>\n{ctx.text}',
+                                    text=f'{t_settings.format(group_id=group_id, bot_user=t_bot_user, upd_time=update_time(db["settings"][index_of_chat]["updated_date"]))}\n\n<b>Запрет репостов:</b>\n{ctx.text}',
                                     reply_markup=generate_block_repostes_show(ctx.from_user.id, index_of_chat))
     except Exception as e:
         print(e)
@@ -251,13 +251,13 @@ async def pingw_change_text(ctx: Message, state: FSMContext):
         index_of_chat = get_dict_index(db, group_id)
 
         collection.find_one_and_update({"user_id": ctx.from_user.id},
-                                       {'$set': {f'settings.{index_of_chat}.block_ping.warning': ctx.text}})
-
+                                       {'$set': {f'settings.{index_of_chat}.block_ping.warning': ctx.text, f"settings.{index_of_chat}.updated_date": get_msk_unix()}})
+        db = collection.find_one({"user_id": ctx.from_user.id})
         await bot.send_message(ctx.chat.id, text=f'Успешное изменение ✅')
         await state.finish()
         await asyncio.sleep(2)
         await bot.send_message(chat_id=ctx.chat.id,
-                                    text=f'⚙ Настройки чата (<a href="https://{group_id}.id">{group_id}</a>)\n\n<b>Запрет пинга:</b>\n{ctx.text}',
+                                    text=f'{t_settings.format(group_id=group_id, bot_user=t_bot_user, upd_time=update_time(db["settings"][index_of_chat]["updated_date"]))}\n\n<b>Запрет пинга:</b>\n{ctx.text}',
                                     reply_markup=generate_block_ping_show(ctx.from_user.id, index_of_chat))
     except Exception as e:
         print(e)

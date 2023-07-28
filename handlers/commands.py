@@ -1,38 +1,20 @@
 # Обработчики команд:
 import asyncio
 import re
+import time
+import pytz
 from data.loader import bot, dp, FSMContext, State, Message
 from database.database import collection, ObjectId
 from states_scenes.scene import MySceneStates
-from keyboards.inline_keyboards import generate_add_button, generate_settings_button, generate_check_admin_rights, generate_settings
+from keyboards.inline_keyboards import *
 from time import sleep
-from data.configs import resolve_username_to_user_id, delete_message, add_time_to_unix, get_dict_index
+from data.configs import *
 from datetime import datetime
-import pytz
+from data.texts import *
 
-@dp.message_handler(commands=['start', 'help'])
+@dp.message_handler(commands=['start'])
 async def start_help_command_handler(ctx: Message):
     try:
-        if ctx.chat.type == 'group' or ctx.chat.type == 'supergroup':
-            admins = await bot.get_chat_administrators(ctx.chat.id)
-            creator_id = next((obj for obj in admins if obj["status"] == "creator"), None).user.id
-            for me in admins:
-                if me.user.username == "shieldsword_bot":
-                    if me.can_manage_chat == True and me.can_delete_messages == True and me.can_restrict_members == True and me.can_invite_users == True and me.can_promote_members == True:
-                        return await ctx.answer(
-                            '🤖 Здравствуйте! Я бот-админ и могу администрировать данный чат.\n\nДля того чтобы меня настроить, нажмите на кнопку настроить:',
-                            reply_markup=generate_settings_button(f'{ctx.chat.id}_{creator_id}'))
-                    else:
-                        return await ctx.answer(
-                            '🤖 Здравствуйте! Я бот-админ и могу администрировать данный чат.\n\nВыдайте мне все права администратора:\n- Управлять группой\n- Удаление сообщений\n- Изменение сообщений\n- Блокировать участников\n- Добовлять участников\n- Управлять пользователями\n- Добавление администраторов',
-                            reply_markup=generate_check_admin_rights())
-                    break
-                else:
-                    return await ctx.answer(
-                        '🤖 Здравствуйте! Я бот-админ и могу администрировать данный чат.\n\nВыдайте мне все права администратора:\n- Управлять группой\n- Удаление сообщений\n- Изменение сообщений\n- Блокировать участников\n- Добовлять участников\n- Управлять пользователями\n- Добавление администраторов',
-                        reply_markup=generate_check_admin_rights())
-                    break
-
         if '/start settings_' in ctx.text:
             call_data = ctx.text.replace('/start ', '')
             call_datas = call_data.split('_')
@@ -46,25 +28,46 @@ async def start_help_command_handler(ctx: Message):
                     generate_user_data_id = admindb['users_count'] + 1
                     collection.insert_one(
                         {"user_id": ctx.from_user.id, "register_data": datetime.now().strftime("%d.%m.%Y"),
-                         "inlineid": generate_user_data_id, "chats": [], "settings": [], "lic": 0})
+                         "inlineid": generate_user_data_id, "manual_msg": False, "manual_msg": False, "manual_s": False, "chats": [], "settings": [], "lic": 0})
                     collection.find_one_and_update({"_id": ObjectId('64987b1eeed9918b13b0e8b4')},
                                                    {"$set": {"users_count": generate_user_data_id},
                                                     "$push": {"users": ctx.from_user.id}})
                     user_db = collection.find_one({"user_id": ctx.from_user.id})
-
                 if call_datas[1] not in user_db['chats']:
-                    collection.find_one_and_update({"user_id": ctx.from_user.id}, {"$push": {"chats": call_datas[1], "settings": {"chat_id": call_datas[1], "lic": False, "lic_end": 'None', "lic_buyed_date": 'None', "rules": 'None', "greeting": 'None', "warning_ban": 'None', "warning_kick": 'None', "unban_text": 'None', "warning_resources": 'None', "warning_repostes": 'None', "warning_ping": 'None', 'afk': 'None', 'system_notice': {'active': False}, 'block_repostes': {'active': False, 'warning': 'None'}, "block_ping": {'active': False, 'warning': 'None'},'block_resources': {'active': False, 'warning': 'None', "r_list": ["com" , "ru"]}}}})
+                    collection.find_one_and_update({"user_id": ctx.from_user.id}, {"$push": {"chats": call_datas[1], "settings": {"chat_id": call_datas[1], "updated_date": get_msk_unix(), "lic": False, "lic_end": 'None', "lic_buyed_date": 'None', "rules": 'None', "greeting": 'None', "warning_ban": 'None', "warning_kick": 'None', "unban_text": 'None', "warning_resources": 'None', "warning_repostes": 'None', "warning_ping": 'None', 'afk': 'None', 'system_notice': {'active': False}, 'block_repostes': {'active': False, 'warning': 'None'}, "block_ping": {'active': False, 'warning': 'None'},'block_resources': {'active': False, 'warning': 'None', "r_list": ["com" , "ru"]}}}})
                     collection.find_one_and_update({"_id": ObjectId('64987b1eeed9918b13b0e8b4')}, {"$push": {"groups": call_datas[1]}})
                 db = collection.find_one({"chats": call_datas[1]})
                 index_of_chat = get_dict_index(db, call_datas[1])
-                if db['settings'][index_of_chat]['lic'] == True: return await ctx.answer(f'⚙ Настройки чата (<a href="https://{call_datas[1]}.id">{call_datas[1]}</a>):', reply_markup=generate_settings(True))
-                return await ctx.answer(f'⚙ Настройки чата (<a href="https://{call_datas[1]}.id">{call_datas[1]}</a>):', reply_markup=generate_settings())
+                if db['settings'][index_of_chat]['lic'] == True: return await ctx.answer(settings_start.format(group_id=call_datas[1], bot_user=bot_user, upd_time=update_time(db['settings'][index_of_chat]['updated_date'])), reply_markup=generate_settings(True))
+                return await ctx.answer(t_settings.format(group_id=call_datas[1], bot_user=t_bot_user, upd_time=update_time(db['settings'][index_of_chat]['updated_date'])), reply_markup=generate_settings())
+
+
+        if ctx.chat.type == 'group' or ctx.chat.type == 'supergroup':
+            if ctx['from']['username'] == 'GroupAnonymousBot': return await ctx.answer('🤷‍♂ Извините, Аноним мы уважаем ваше решение но мы не можем идентифицировать создателя группы пока тот является анонимом...\n\nПопросим вас выключить анонимность на пару минут и следовать инструкция бота, но а позже вы сможете обратно включить анонимность и управлять ботом в личных сообщениях!')
+            admins = await bot.get_chat_administrators(ctx.chat.id)
+            creator_id = next((obj for obj in admins if obj["status"] == "creator"), None).user.id
+            for me in admins:
+                if me.user.username == t_bot_user:
+                    if me.can_manage_chat == True and me.can_delete_messages == True and me.can_restrict_members == True and me.can_invite_users == True and me.can_promote_members == True:
+                        return await ctx.answer(
+                            '🤖 Вы выполнили корректные действия.\n\nНажмите кнопку "Настроить бота"',
+                            reply_markup=generate_settings_button(f'{ctx.chat.id}_{creator_id}'))
+                    else:
+                        return await ctx.answer(
+                            '🤖 Здравствуйте! Я бот-админ и могу администрировать данный чат.\n\nВыдайте мне все права администратора:\n- Управлять группой\n- Удаление сообщений\n- Изменение сообщений\n- Блокировать участников\n- Добовлять участников\n- Управлять пользователями\n- Добавление администраторов',
+                            reply_markup=generate_check_admin_rights())
+                    break
+                else:
+                    return await ctx.answer(
+                        '🤖 Здравствуйте! Я бот-админ и могу администрировать данный чат.\n\nВыдайте мне все права администратора:\n- Управлять группой\n- Удаление сообщений\n- Изменение сообщений\n- Блокировать участников\n- Добовлять участников\n- Управлять пользователями\n- Добавление администраторов',
+                        reply_markup=generate_check_admin_rights())
+                    break
 
         db = collection.find_one({"user_id": ctx.from_user.id})
         if db == None:
             admindb = collection.find_one({"_id": ObjectId('64987b1eeed9918b13b0e8b4')})
             generate_user_data_id = admindb['users_count'] + 1
-            collection.insert_one({"user_id": ctx.from_user.id, "register_data": datetime.now().strftime("%d.%m.%Y"),"inlineid": generate_user_data_id, "chats": [], "settings": [], "lic": 0})
+            collection.insert_one({"user_id": ctx.from_user.id, "manual_s": False, "manual_msg": False, "register_data": datetime.now().strftime("%d.%m.%Y"),"inlineid": generate_user_data_id, "chats": [], "settings": [], "lic": 0})
             collection.find_one_and_update({"_id": ObjectId('64987b1eeed9918b13b0e8b4')},
                                            {"$set": {"users_count": generate_user_data_id},
                                             "$push": {"users": ctx.from_user.id}})
@@ -78,6 +81,11 @@ async def start_help_command_handler(ctx: Message):
 async def handler_to_ban(ctx: Message):
     try:
         if ctx.chat.type == 'group' or ctx.chat.type == 'supergroup':
+            trash = ''
+            if ctx['from']['username'] == 'GroupAnonymousBot':
+                trash = await ctx.answer(
+                '🤷‍♂ Извините, Аноним мы уважаем ваше решение, но мы не можем идентифицировать вас и ваши прова пока вы являетесь анонимом...\n\nПопросим вас выключить анонимность на пару минут и использовать данную команду, а позже вы сможете обратно включить анонимность!')
+                return asyncio.create_task(delete_message(15, [trash.message_id, ctx.message_id], trash.chat.id))
             admins = await bot.get_chat_administrators(ctx.chat.id)
             creator_id = next((obj for obj in admins if obj["status"] == "creator"), None).user.id
             isadmin = False
@@ -166,6 +174,11 @@ async def handler_to_ban(ctx: Message):
 async def handler_to_unban(ctx: Message):
     try:
         if ctx.chat.type == 'group' or ctx.chat.type == 'supergroup':
+            trash = ''
+            if ctx['from']['username'] == 'GroupAnonymousBot':
+                trash = await ctx.answer(
+                '🤷‍♂ Извините, Аноним мы уважаем ваше решение, но мы не можем идентифицировать вас и ваши прова пока вы являетесь анонимом...\n\nПопросим вас выключить анонимность на пару минут и использовать данную команду, а позже вы сможете обратно включить анонимность!')
+                return asyncio.create_task(delete_message(15, [trash.message_id, ctx.message_id], trash.chat.id))
             admins = await bot.get_chat_administrators(ctx.chat.id)
             isadmin = False
             for user in admins:
@@ -255,6 +268,11 @@ async def handler_to_unban(ctx: Message):
 async def handler_to_kick(ctx: Message):
     try:
         if ctx.chat.type == 'group' or ctx.chat.type == 'supergroup':
+            trash = ''
+            if ctx['from']['username'] == 'GroupAnonymousBot':
+                trash = await ctx.answer(
+                '🤷‍♂ Извините, Аноним мы уважаем ваше решение, но мы не можем идентифицировать вас и ваши прова пока вы являетесь анонимом...\n\nПопросим вас выключить анонимность на пару минут и использовать данную команду, а позже вы сможете обратно включить анонимность!')
+                return asyncio.create_task(delete_message(15, [trash.message_id, ctx.message_id], trash.chat.id))
             admins = await bot.get_chat_administrators(ctx.chat.id)
             isadmin = False
             for user in admins:
@@ -460,6 +478,11 @@ async def answer_to_rules(ctx: Message):
 async def answer_to_settings(ctx: Message):
     try:
         if ctx.chat.type == 'group' or ctx.chat.type == 'supergroup':
+            trash = ''
+            if ctx['from']['username'] == 'GroupAnonymousBot':
+                trash = await ctx.answer(
+                '🤷‍♂ Извините, Аноним мы уважаем ваше решение, но мы не можем идентифицировать создателя группы пока вы являетесь анонимом...\n\nПопросим вас выключить анонимность на пару минут и использовать команду, а позже вы сможете обратно включить анонимность!')
+                return asyncio.create_task(delete_message(15, [trash.message_id, ctx.message_id], trash.chat.id))
             admins = await bot.get_chat_administrators(ctx.chat.id)
             creator_id = next((obj for obj in admins if obj["status"] == "creator"), None).user.id
             trash = await ctx.answer('Для того чтобы изменить настройки, перейдите в бота по кнопке ниже:',

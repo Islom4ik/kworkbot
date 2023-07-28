@@ -8,6 +8,18 @@ import time
 import pytz
 from keyboards.inline_keyboards import generate_add_button
 
+def get_msk_unix():
+    tz_msk = pytz.timezone('Europe/Moscow')
+    current_time_utc = datetime.utcnow()
+    current_time_msk = tz_msk.localize(current_time_utc)
+    unix_time_msk = int(current_time_msk.timestamp())
+    return unix_time_msk
+
+def update_time(unix_time):
+    dt_msk = datetime.fromtimestamp(unix_time, pytz.timezone('Europe/Moscow'))
+    formatted_time = dt_msk.strftime("%d.%m.%Y в %H:%M")
+    return formatted_time
+
 def calculate_end_date(days):
     tz_moscow = pytz.timezone('Europe/Moscow')
 
