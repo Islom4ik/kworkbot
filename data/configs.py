@@ -3,20 +3,20 @@ from data.loader import pyrogram_client, ResolveUsername
 from data.loader import bot
 import re
 from database.database import collection, ObjectId
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import time
 import pytz
 from keyboards.inline_keyboards import generate_add_button
 
 def get_msk_unix():
-    tz_msk = pytz.timezone('Europe/Moscow')
-    current_time_utc = datetime.utcnow()
-    current_time_msk = tz_msk.localize(current_time_utc)
+    tz_msk = timezone(timedelta(hours=3))
+    current_time_msk = datetime.now(tz_msk)
     unix_time_msk = int(current_time_msk.timestamp())
     return unix_time_msk
 
 def update_time(unix_time):
-    dt_msk = datetime.fromtimestamp(unix_time, pytz.timezone('Europe/Moscow'))
+    dt_utc = datetime.fromtimestamp(unix_time, timezone.utc)
+    dt_msk = dt_utc + timedelta(hours=3)
     formatted_time = dt_msk.strftime("%d.%m.%Y в %H:%M")
     return formatted_time
 
@@ -84,7 +84,7 @@ def get_price_index(days):
             break
     return index_of_price
 
-async def resolve_username_to_user_id(username: str) -> int | None:
+async def resolve_username_to_user_id(username: str):
     try:
         async with pyrogram_client:
             r = await pyrogram_client.invoke(ResolveUsername(username=username))
@@ -118,7 +118,7 @@ async def delete_message(timer_s, message_ids: list, chat_id):
     except Exception as e:
         print('error delete')
 
-def contains_external_links(text: str, blocked_domains: list) -> bool:
+def contains_external_links(text: str, blocked_domains: list):
     try:
         # Паттерн для поиска ссылок на запрещенные зоны
         pattern = r"(https?://)?([^\s]+\.(%s))" % "|".join(blocked_domains)

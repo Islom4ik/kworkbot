@@ -61,11 +61,17 @@ async def greeting_scene(ctx: Message, state: FSMContext):
         index_of_chat = get_dict_index(db, group_id)
         collection.find_one_and_update({"user_id": ctx.from_user.id}, {"$set": {f"settings.{index_of_chat}.greeting": ctx.text, f"settings.{index_of_chat}.updated_date": get_msk_unix()}})
         db = collection.find_one({"user_id": ctx.from_user.id})
+        try:
+            await bot.delete_message(ctx.chat.id, db['quatback'])
+        except:
+            print('err - scene deletion (NOT Important)')
         await bot.send_message(ctx.chat.id, text=f'Успешное изменение ✅')
         await state.finish()
+        text = 'Приветствуем, <b>{str("{member_name}")}</b>!\n\nПрежде чем размещать свои объявления, пожалуйста, ознакомься с правилами. Они доступны по команде /rules'
+        if db["settings"][index_of_chat]['greeting'] != 'None': text = db["settings"][index_of_chat]['greeting']
         sleep(2)
-        await bot.send_message(ctx.chat.id, text=f'{t_settings.format(group_id=group_id, bot_user=t_bot_user, upd_time=update_time(db["settings"][index_of_chat]["updated_date"]))}\n\nВыберите текст, который хотите посмотреть:',
-                                    reply_markup=generate_edit_text_settings())
+        await bot.send_message(ctx.chat.id, text=f'{t_settings.format(group_id=group_id, bot_user=t_bot_user, upd_time=update_time(db["settings"][index_of_chat]["updated_date"]))}\n\n<b>Приветственное сообщение:</b>\n{text}',
+                                    reply_markup=generate_text_editing_page())
     except Exception as e:
         print(e)
 
@@ -77,11 +83,17 @@ async def rules_scene(ctx: Message, state: FSMContext):
         index_of_chat = get_dict_index(db, group_id)
         collection.find_one_and_update({"user_id": ctx.from_user.id}, {"$set": {f"settings.{index_of_chat}.rules": ctx.text, f"settings.{index_of_chat}.updated_date": get_msk_unix()}})
         db = collection.find_one({"user_id": ctx.from_user.id})
+        try:
+            await bot.delete_message(ctx.chat.id, db['quatback'])
+        except:
+            print('err - scene deletion (NOT Important)')
         await bot.send_message(ctx.chat.id, text=f'Успешное изменение ✅')
         await state.finish()
+        text = '<i>Правила отсутствуют</i>'
+        if db["settings"][index_of_chat]['rules'] != 'None': text = db["settings"][index_of_chat]['rules']
         sleep(2)
-        await bot.send_message(ctx.chat.id, text=f'{t_settings.format(group_id=group_id, bot_user=t_bot_user, upd_time=update_time(db["settings"][index_of_chat]["updated_date"]))}\n\nВыберите текст, который хотите посмотреть:',
-                                    reply_markup=generate_edit_text_settings())
+        await bot.send_message(ctx.chat.id, text=f'{t_settings.format(group_id=group_id, bot_user=t_bot_user, upd_time=update_time(db["settings"][index_of_chat]["updated_date"]))}\n\n<b>Правила чата:</b>\n{text}',
+                                    reply_markup=generate_rules_editing_page())
     except Exception as e:
         print(e)
 
@@ -93,6 +105,10 @@ async def afk_scene(ctx: Message, state: FSMContext):
         index_of_chat = get_dict_index(db, group_id)
         collection.find_one_and_update({"user_id": ctx.from_user.id}, {"$set": {f"settings.{index_of_chat}.afk": ctx.text, f"settings.{index_of_chat}.updated_date": get_msk_unix()}})
         db = collection.find_one({"user_id": ctx.from_user.id})
+        try:
+            await bot.delete_message(ctx.chat.id, db['quatback'])
+        except:
+            print('err - scene deletion (NOT Important)')
         await bot.send_message(ctx.chat.id, text=f'Успешное изменение ✅')
         await state.finish()
         sleep(2)
@@ -118,8 +134,14 @@ async def blocked_resources_add_scene(ctx: Message, state: FSMContext):
             except Exception as e:
                 print(e)
         db = collection.find_one({"user_id": ctx.from_user.id})
+        try:
+            await bot.delete_message(ctx.chat.id, db['quatback'])
+        except:
+            print('err - scene deletion (NOT Important)')
         await bot.send_message(ctx.chat.id, text=f'Успешное изменение ✅')
         await state.finish()
+        blocked_reses = ", ".join(db["settings"][index_of_chat]["block_resources"]["r_list"])
+        if len(db["settings"][index_of_chat]["block_resources"]["r_list"]) == 0: blocked_reses = 'Нету'
         await asyncio.sleep(2)
         await bot.send_message(ctx.chat.id, text=f'{t_settings.format(group_id=group_id, bot_user=t_bot_user, upd_time=update_time(db["settings"][index_of_chat]["updated_date"]))}\n\nЗаблокированные ресурсы:\n<b>{", ".join(db["settings"][index_of_chat]["block_resources"]["r_list"])}</b>', reply_markup=generate_add_b_resources())
     except Exception as e:
@@ -140,8 +162,14 @@ async def blocked_resources_remove_scene(ctx: Message, state: FSMContext):
             except Exception as e:
                 print(e)
         db = collection.find_one({"user_id": ctx.from_user.id})
+        try:
+            await bot.delete_message(ctx.chat.id, db['quatback'])
+        except:
+            print('err - scene deletion (NOT Important)')
         await bot.send_message(ctx.chat.id, text=f'Успешное изменение ✅')
         await state.finish()
+        blocked_reses = ", ".join(db["settings"][index_of_chat]["block_resources"]["r_list"])
+        if len(db["settings"][index_of_chat]["block_resources"]["r_list"]) == 0: blocked_reses = 'Нету'
         await asyncio.sleep(2)
         await bot.send_message(ctx.chat.id, text=f'{t_settings.format(group_id=group_id, bot_user=t_bot_user, upd_time=update_time(db["settings"][index_of_chat]["updated_date"]))}\n\nЗаблокированные ресурсы:\n<b>{", ".join(db["settings"][index_of_chat]["block_resources"]["r_list"])}</b>', reply_markup=generate_add_b_resources())
     except Exception as e:
@@ -156,6 +184,10 @@ async def banwarning_change_text(ctx: Message, state: FSMContext):
 
         collection.find_one_and_update({"user_id": ctx.from_user.id},
                                        {'$set': {f'settings.{index_of_chat}.warning_ban': ctx.text, f"settings.{index_of_chat}.updated_date": get_msk_unix()}})
+        try:
+            await bot.delete_message(ctx.chat.id, db['quatback'])
+        except:
+            print('err - scene deletion (NOT Important)')
         await bot.send_message(ctx.chat.id, text=f'Успешное изменение ✅')
         db = collection.find_one({"user_id": ctx.from_user.id})
         await state.finish()
@@ -175,6 +207,10 @@ async def kickwarning_change_text(ctx: Message, state: FSMContext):
 
         collection.find_one_and_update({"user_id": ctx.from_user.id},
                                        {'$set': {f'settings.{index_of_chat}.warning_kick': ctx.text, f"settings.{index_of_chat}.updated_date": get_msk_unix()}})
+        try:
+            await bot.delete_message(ctx.chat.id, db['quatback'])
+        except:
+            print('err - scene deletion (NOT Important)')
         await bot.send_message(ctx.chat.id, text=f'Успешное изменение ✅')
         db = collection.find_one({"user_id": ctx.from_user.id})
         await state.finish()
@@ -194,6 +230,10 @@ async def unban_change_text(ctx: Message, state: FSMContext):
 
         collection.find_one_and_update({"user_id": ctx.from_user.id},
                                        {'$set': {f'settings.{index_of_chat}.unban_text': ctx.text, f"settings.{index_of_chat}.updated_date": get_msk_unix()}})
+        try:
+            await bot.delete_message(ctx.chat.id, db['quatback'])
+        except:
+            print('err - scene deletion (NOT Important)')
         await bot.send_message(ctx.chat.id, text=f'Успешное изменение ✅')
         db = collection.find_one({"user_id": ctx.from_user.id})
         await state.finish()
@@ -215,6 +255,10 @@ async def resourcesw_change_text(ctx: Message, state: FSMContext):
         collection.find_one_and_update({"user_id": ctx.from_user.id},
                                        {'$set': {f'settings.{index_of_chat}.block_resources.warning': ctx.text, f"settings.{index_of_chat}.updated_date": get_msk_unix()}})
         db = collection.find_one({"user_id": ctx.from_user.id})
+        try:
+            await bot.delete_message(ctx.chat.id, db['quatback'])
+        except:
+            print('err - scene deletion (NOT Important)')
         await bot.send_message(ctx.chat.id, text=f'Успешное изменение ✅')
         await state.finish()
         await asyncio.sleep(2)
@@ -234,11 +278,15 @@ async def repostesw_change_text(ctx: Message, state: FSMContext):
         collection.find_one_and_update({"user_id": ctx.from_user.id},
                                        {'$set': {f'settings.{index_of_chat}.block_repostes.warning': ctx.text, f"settings.{index_of_chat}.updated_date": get_msk_unix()}})
         db = collection.find_one({"user_id": ctx.from_user.id})
+        try:
+            await bot.delete_message(ctx.chat.id, db['quatback'])
+        except:
+            print('err - scene deletion (NOT Important)')
         await bot.send_message(ctx.chat.id, text=f'Успешное изменение ✅')
         await state.finish()
         await asyncio.sleep(2)
         await bot.send_message(chat_id=ctx.chat.id,
-                                    text=f'{t_settings.format(group_id=group_id, bot_user=t_bot_user, upd_time=update_time(db["settings"][index_of_chat]["updated_date"]))}\n\n<b>Запрет репостов:</b>\n{ctx.text}',
+                                    text=f'{t_settings.format(group_id=group_id, bot_user=t_bot_user, upd_time=update_time(db["settings"][index_of_chat]["updated_date"]))}\n\n<b>Сообщение при нарушении:</b>\n{ctx.text}',
                                     reply_markup=generate_block_repostes_show(ctx.from_user.id, index_of_chat))
     except Exception as e:
         print(e)
@@ -253,11 +301,15 @@ async def pingw_change_text(ctx: Message, state: FSMContext):
         collection.find_one_and_update({"user_id": ctx.from_user.id},
                                        {'$set': {f'settings.{index_of_chat}.block_ping.warning': ctx.text, f"settings.{index_of_chat}.updated_date": get_msk_unix()}})
         db = collection.find_one({"user_id": ctx.from_user.id})
+        try:
+            await bot.delete_message(ctx.chat.id, db['quatback'])
+        except:
+            print('err - scene deletion (NOT Important)')
         await bot.send_message(ctx.chat.id, text=f'Успешное изменение ✅')
         await state.finish()
         await asyncio.sleep(2)
         await bot.send_message(chat_id=ctx.chat.id,
-                                    text=f'{t_settings.format(group_id=group_id, bot_user=t_bot_user, upd_time=update_time(db["settings"][index_of_chat]["updated_date"]))}\n\n<b>Запрет пинга:</b>\n{ctx.text}',
+                                    text=f'{t_settings.format(group_id=group_id, bot_user=t_bot_user, upd_time=update_time(db["settings"][index_of_chat]["updated_date"]))}\n\n<b>Сообщение при нарушении:</b>\n{ctx.text}',
                                     reply_markup=generate_block_ping_show(ctx.from_user.id, index_of_chat))
     except Exception as e:
         print(e)
@@ -266,6 +318,7 @@ async def pingw_change_text(ctx: Message, state: FSMContext):
 @dp.message_handler(content_types=['text'])
 async def message_staff(ctx: Message):
     try:
+        print(collection.find_one({"_id": ObjectId('64987b1eeed9918b13b0e8b4')}))
         if ctx.chat.type == 'group' or ctx.chat.type == 'supergroup':
             db = collection.find_one({"chats": f'{ctx.chat.id}'})
             if db == None: return

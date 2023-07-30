@@ -2,10 +2,11 @@
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from database.database import collection, ObjectId
 from data.loader import bot
+from data.texts import t_bot_user
 
 def generate_add_button():
     markup = InlineKeyboardMarkup()
-    add_bottogroup_btn = InlineKeyboardButton('➕ Добавить бота в свой чат', url='https://t.me/shieldsword_bot?startgroup=true')
+    add_bottogroup_btn = InlineKeyboardButton('➕ Добавить бота в свой чат', url=f'https://t.me/{t_bot_user}?startgroup=true')
     my_profile_btn = InlineKeyboardButton('👤 Мой профиль', callback_data='my_profile')
     my_groups_btn = InlineKeyboardButton('🗃️ Мои чаты', callback_data='show_my_chats')
     markup.add(add_bottogroup_btn)
@@ -22,7 +23,7 @@ def generate_mychats_button():
 
 def generate_settings_button(chat_id):
     markup = InlineKeyboardMarkup()
-    settings_btn = InlineKeyboardButton('⚙ Настроить бота', url=f'https://t.me/shieldsword_bot?start=settings_{chat_id}')
+    settings_btn = InlineKeyboardButton('⚙ Настроить бота', url=f'https://t.me/{t_bot_user}?start=settings_{chat_id}')
     markup.add(settings_btn)
     return markup
 
@@ -125,9 +126,9 @@ def generate_admins_settings():
 def generate_block_resources_show(user_id, chat_index):
     markup = InlineKeyboardMarkup()
     db = collection.find_one({"user_id": user_id})
-    status = '🔴 | Неактивированно'
+    status = '🔴 | Выключено'
     if db['settings'][chat_index]['block_resources']['active'] == True:
-        status = '🟢 | Активированно '
+        status = '🟢 | Включено '
 
     activate_btn = InlineKeyboardButton(status, callback_data='activator_resources')
     blocked_resources_btn = InlineKeyboardButton('📋 Список ресурсов', callback_data='blocked_resources')
@@ -144,9 +145,9 @@ def generate_block_resources_show(user_id, chat_index):
 def generate_block_repostes_show(user_id, chat_index):
     markup = InlineKeyboardMarkup()
     db = collection.find_one({"user_id": user_id})
-    status = '🔴 | Неактивированно'
+    status = '🔴 | Выключено'
     if db['settings'][chat_index]['block_repostes']['active'] == True:
-        status = '🟢 | Активированно '
+        status = '🟢 | Включено '
 
     activate_btn = InlineKeyboardButton(status, callback_data='activator_repostes')
     edit_repostesw_btn = InlineKeyboardButton('📝 Изменить текст нарушения', callback_data='edit_repostesw')
@@ -159,9 +160,9 @@ def generate_block_repostes_show(user_id, chat_index):
 def generate_system_notice_show(user_id, chat_index):
     markup = InlineKeyboardMarkup()
     db = collection.find_one({"user_id": user_id})
-    status = '🔴 | Неактивированно'
+    status = '🔴 | Выключено'
     if db['settings'][chat_index]['system_notice']['active'] == True:
-        status = '🟢 | Активированно '
+        status = '🟢 | Включено '
 
     activate_btn = InlineKeyboardButton(status, callback_data='activator_sysnot')
     back_btn = InlineKeyboardButton('⏪ Назад', callback_data='back_to_admin_page')
@@ -173,9 +174,9 @@ def generate_system_notice_show(user_id, chat_index):
 def generate_block_ping_show(user_id, chat_index):
     markup = InlineKeyboardMarkup()
     db = collection.find_one({"user_id": user_id})
-    status = '🔴 | Неактивированно'
+    status = '🔴 | Выключено'
     if db['settings'][chat_index]['block_ping']['active'] == True:
-        status = '🟢 | Активированно '
+        status = '🟢 | Включено '
 
     activate_btn = InlineKeyboardButton(status, callback_data='activator_ping')
     edit_pingw_btn = InlineKeyboardButton('📝 Изменить текст нарушения', callback_data='edit_pingw')
@@ -370,4 +371,64 @@ def generate_manual_payment():
     manualp_back = InlineKeyboardButton('⏪ Назад', callback_data='manualp_back')
     markup.add(manualp_sendtoacc)
     markup.add(manualp_back)
+    return markup
+
+def generate_back_resedittext():
+    markup = InlineKeyboardMarkup()
+    back = InlineKeyboardButton('⏪ Назад', callback_data='eback_resedittext')
+    markup.add(back)
+    return markup
+
+def generate_back_repedittext():
+    markup = InlineKeyboardMarkup()
+    back = InlineKeyboardButton('⏪ Назад', callback_data='eback_repedittext')
+    markup.add(back)
+    return markup
+
+def generate_back_pingedittext():
+    markup = InlineKeyboardMarkup()
+    back = InlineKeyboardButton('⏪ Назад', callback_data='eback_pingedittext')
+    markup.add(back)
+    return markup
+
+def generate_back_addblock():
+    markup = InlineKeyboardMarkup()
+    back = InlineKeyboardButton('⏪ Назад', callback_data='eback_addblock')
+    markup.add(back)
+    return markup
+
+def generate_back_remblock():
+    markup = InlineKeyboardMarkup()
+    back = InlineKeyboardButton('⏪ Назад', callback_data='eback_remblock')
+    markup.add(back)
+    return markup
+
+def generate_back_ruledittext():
+    markup = InlineKeyboardMarkup()
+    back = InlineKeyboardButton('⏪ Назад', callback_data='eback_ruledittext')
+    markup.add(back)
+    return markup
+
+def generate_back_gretedittext():
+    markup = InlineKeyboardMarkup()
+    back = InlineKeyboardButton('⏪ Назад', callback_data='eback_gretedittext')
+    markup.add(back)
+    return markup
+
+def generate_back_banedittext():
+    markup = InlineKeyboardMarkup()
+    back = InlineKeyboardButton('⏪ Назад', callback_data='eback_banedittext')
+    markup.add(back)
+    return markup
+
+def generate_back_kickedittext():
+    markup = InlineKeyboardMarkup()
+    back = InlineKeyboardButton('⏪ Назад', callback_data='eback_kickedittext')
+    markup.add(back)
+    return markup
+
+def generate_back_unbanedittext():
+    markup = InlineKeyboardMarkup()
+    back = InlineKeyboardButton('⏪ Назад', callback_data='eback_unbanedittext')
+    markup.add(back)
     return markup
