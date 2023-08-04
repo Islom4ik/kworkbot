@@ -342,9 +342,17 @@ async def message_staff(ctx: Message):
             if get_user == None: collection.find_one_and_update({'chats': f'{ctx.chat.id}'}, {"$push": {f'settings.{index_of_chat}.users': {"id": ctx.from_user.id, 'l_msg': get_msk_unix()}}})
             else: collection.find_one_and_update({'chats': f'{ctx.chat.id}'}, {"$set": {f'settings.{index_of_chat}.users.{get_user}.l_msg': get_msk_unix()}})
             adb = collection.find_one({"_id": ObjectId('64987b1eeed9918b13b0e8b4')})
-            if users_count > adb['limit_to_users'] and db['user_id'] not in adb['admins'] and db['user_id'] != int(config['MAIN_ADMIN_ID']) and db['settings'][index_of_chat]['lic'] == False:
-                return await bot.send_message(db['user_id'], f'Вы превысили Бесплатный лимит подписчиков на группу. Чтобы продолжить использовать бота, необходимо приобрести лицензию на чат в настройках чата - <b>{ctx.chat.title}</b>', reply_markup=generate_mychats_button(), disable_notification=False)
-
+            if users_count > adb['limit_to_users'] and db['settings'][index_of_chat]['lic'] == False:
+                if 'lic_warn' not in db['settings'][index_of_chat]: collection.find_one_and_update({'chats': f'{ctx.chat.id}'}, {
+                "$set": {f"settings.{index_of_chat}.lic_warn": False}})
+                db = collection.find_one({'chats': f'{ctx.chat.id}'})
+                if db['settings'][index_of_chat]['lic_warn'] == False:
+                    await bot.send_message(db['user_id'],
+                                           f'Вы превысили Бесплатный лимит подписчиков на группу. Чтобы продолжить использовать бота, необходимо приобрести лицензию на чат в настройках чата - <b>{ctx.chat.title}</b>',
+                                           reply_markup=generate_mychats_button(), disable_notification=False)
+                    return collection.find_one_and_update({'chats': f'{ctx.chat.id}'}, {
+                        "$set": {f"settings.{index_of_chat}.lic_warn": True}})
+            # and db['user_id'] not in adb['admins'] and db['user_id'] != int(config['MAIN_ADMIN_ID'])
             if db['settings'][index_of_chat]['block_repostes']['active'] == True:
                 if ctx.forward_from:
                     await ctx.delete()
