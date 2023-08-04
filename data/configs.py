@@ -1,11 +1,12 @@
 import asyncio
 from data.loader import pyrogram_client, ResolveUsername
 from data.loader import bot
-import re
+from data.texts import *
 from database.database import collection, ObjectId
 from datetime import datetime, timedelta, timezone
 import time
 import pytz
+import re
 from keyboards.inline_keyboards import generate_add_button
 
 def get_msk_unix():
@@ -75,6 +76,20 @@ def get_user_dict_index(dict):
             index_dict = index
     return index_dict
 
+def get_chat_user_dict_index(db, user_id, indexofchat):
+    index_dict = None
+    for index, item in enumerate(db['settings'][indexofchat]['users']):
+        if item.get("id") == user_id:
+            index_dict = index
+            break
+    return index_dict
+
+def days_since_unix_time(unix_time):
+    current_time_unix = get_msk_unix()
+    time_difference_seconds = current_time_unix - unix_time
+    days_difference = int(time_difference_seconds / (60 * 60 * 24))
+    return days_difference
+
 def get_price_index(days):
     index_of_price = 0
     db = collection.find_one({"_id": ObjectId('64987b1eeed9918b13b0e8b4')})
@@ -94,17 +109,6 @@ async def resolve_username_to_user_id(username: str):
     except Exception as e:
         print(e)
 
-
-async def done_message(chat_id):
-    try:
-        await asyncio.sleep(2)
-        await bot.send_message(chat_id=chat_id,
-                               text='Здравствуйте! Я бот-админ и могу администрировать ваш групповой чат.\n\nДля того чтобы начать, добавьте меня в свой групповой чат:',
-                               reply_markup=generate_add_button())
-
-    except Exception as e:
-        print('error delete')
-
 async def delete_message(timer_s, message_ids: list, chat_id):
     try:
         await asyncio.sleep(timer_s)
@@ -120,16 +124,17 @@ async def delete_message(timer_s, message_ids: list, chat_id):
 
 def contains_external_links(text: str, blocked_domains: list):
     try:
-        # Паттерн для поиска ссылок на запрещенные зоны
-        pattern = r"(https?://)?([^\s]+\.(%s))" % "|".join(blocked_domains)
-        # Проверяем, есть ли ссылки на запрещенные зоны в тексте
-        if re.search(pattern, text):
-            return True
-        else:
-            return False
+        for substring in blocked_domains:
+            if substring in text:
+                return True
+        return False
     except Exception as e:
         print(e)
 
+def trim_array(arr, num_elements_to_keep):
+    if len(arr) > num_elements_to_keep:
+        arr = arr[:num_elements_to_keep]
+    return arr
 
 def check_mentions(text):
     try:
@@ -167,11 +172,14 @@ async def active():
                 db = collection.find_one({'chats': chat_id})
                 index_of_chat = get_dict_index(db, chat_id)
 
+                if db['settings'][index_of_chat]['afk']['active'] == False: continue
+                if db['settings'][index_of_chat]['bot_send_afk'] == True: continue
                 dif = time_diff(db['settings'][index_of_chat]['last_msg'], datetime.now().strftime('%H:%M:%S'))
                 if dif >= 60:
-                    text = 'Что-то все умолкли? Вы гдеее?'
-                    if db['settings'][index_of_chat]['afk'] != 'None': text = db['settings'][index_of_chat]['afk']
+                    text = f'{t_start_text.format(bot_user=t_bot_user)}\n\n<b>Функция:</b> "Ворчун"'
+                    if db['settings'][index_of_chat]['afk']['warning'] != 'None': text = db['settings'][index_of_chat]['afk']['warning']
                     await bot.send_message(chat_id, text=text)
+                    collection.find_one_and_update({'chats': chat_id}, {"$set": {f'settings.{index_of_chat}.bot_send_afk': True}})
 
                 await asyncio.sleep(0.05)
             except Exception as e:
@@ -179,8 +187,8 @@ async def active():
 
         await asyncio.sleep(5)
 
-# loop = asyncio.get_event_loop()
-# loop.create_task(active())
+loop = asyncio.get_event_loop()
+loop.create_task(active())
 
 
 

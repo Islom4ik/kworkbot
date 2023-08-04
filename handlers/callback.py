@@ -6,6 +6,7 @@ from data.loader import bot, dp, FSMContext, State, config
 from database.database import collection, ObjectId
 from states_scenes.scene import MySceneStates
 from aiogram.types import CallbackQuery, ContentTypes, LabeledPrice, PreCheckoutQuery, Message
+from aiogram.utils.exceptions import ChatNotFound
 from data.configs import *
 from data.texts import *
 from keyboards.inline_keyboards import *
@@ -80,7 +81,16 @@ async def react_to_done(call: CallbackQuery):
     try:
         await call.answer()
         await bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id, text=f'⚙ Настройки чата завершена')
-        asyncio.create_task(done_message(chat_id=call.message.chat.id))
+        db = collection.find_one({"user_id": call.from_user.id})
+        if len(db['chats']) >= 1:
+            lic = 'Лицензии нет'
+            if db['lic'] != 'None': lic = db['lic']
+            await bot.send_message(chat_id=call.message.chat.id, text=f'👤 Ваш профиль:\n\n<b>Пользователь:</b> #{db["inlineid"]} - {db["register_data"]}\n<b>Username:</b> @{call.from_user.username}\n<b>Имя:</b> {call.from_user.first_name}\n<b>Чатов:</b> {len(db["chats"])}\n<b>Лицензий:</b> {db["lic"]}',
+                                        reply_markup=generate_add_button())
+        else:
+            await bot.send_message(chat_id=call.message.chat.id,
+                                        text=t_start_text.format(bot_user=t_bot_user),
+                                        reply_markup=generate_add_button())
     except Exception as e:
         print(e)
 
@@ -215,10 +225,10 @@ async def scenes_editor(call: CallbackQuery):
             await call.answer()
             await MySceneStates.unbantext_change_text_scene.set()
             quatback = await bot.send_message(call.message.chat.id, '📋 Введите текст, который будет отправлен после использования команды unban:', reply_markup=generate_back_unbanedittext())
-        elif call_main == 'afk':
+        elif call_main == 'afkw':
             await call.answer()
             await MySceneStates.afk_change_text_scene.set()
-            quatback = await bot.send_message(call.message.chat.id, '📋 Введите текст, который будет уведомлять чат при неактивности:')
+            quatback = await bot.send_message(call.message.chat.id, '📋 Введите текст, который будет уведомлять чат при неактивности:', reply_markup=generate_back_afkedittext())
         elif call_main == 'resourcesw':
             await call.answer()
             await MySceneStates.resourcesw_change_scene.set()
@@ -232,7 +242,7 @@ async def scenes_editor(call: CallbackQuery):
             await MySceneStates.pingw_change_scene.set()
             quatback = await bot.send_message(call.message.chat.id, '📋 Введить новый текст предупреждения о нарушении:', reply_markup=generate_back_pingedittext())
         else:
-            await call.answer()
+            return await call.answer()
         collection.find_one_and_update({"user_id": call.from_user.id}, {"$set": {"chat_editing": group_id, "quatback": quatback.message_id}})
     except Exception as e:
         print(e)
@@ -329,6 +339,18 @@ async def answer_to_eback_ruledittext(call: CallbackQuery, state: FSMContext):
     await bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id,
                                 text=f'{t_settings.format(group_id=group_id, bot_user=t_bot_user, upd_time=update_time(db["settings"][index_of_chat]["updated_date"]))}\n\n<b>Правила чата:</b>\n{text}',
                                 reply_markup=generate_rules_editing_page())
+
+@dp.callback_query_handler(lambda call: call.data == 'eback_afkedittext', state=MySceneStates.afk_change_text_scene)
+async def answer_to_eback_afkedittext(call: CallbackQuery, state: FSMContext):
+    await state.finish()
+    db = collection.find_one({"user_id": call.from_user.id})
+    group_id = db['chat_editing']
+    index_of_chat = get_dict_index(db, group_id)
+    text = f'Текст сообщения отсутствует 🤷‍♂'
+    if db['settings'][index_of_chat]['afk']['warning'] != 'None': text = db['settings'][index_of_chat]['afk']['warning']
+    await bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id,
+                                text=f'{t_settings.format(group_id=group_id, bot_user=t_bot_user, upd_time=update_time(db["settings"][index_of_chat]["updated_date"]))}\n\n<b>Функция "Ворчун":</b>\nЕсли в чате никто не пишет минут, то выводит сообщение:\n{text}',
+                                reply_markup=generate_block_afk_show(db['user_id'], index_of_chat))
 
 @dp.callback_query_handler(lambda call: call.data == 'eback_banedittext', state=MySceneStates.banwarning_change_text_scene)
 @dp.callback_query_handler(lambda call: call.data == 'eback_kickedittext', state=MySceneStates.kickwarning_change_text_scene)
@@ -465,6 +487,15 @@ async def react_to_activator(call: CallbackQuery):
                                                {"$set": {f"settings.{index_of_chat}.system_notice.active": False, f"settings.{index_of_chat}.updated_date": get_msk_unix()}})
             await bot.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id,
                                                 reply_markup=generate_system_notice_show(call.from_user.id, index_of_chat))
+        elif call_data_identificator == "afk":
+            if db['settings'][index_of_chat]['afk']['active'] == False:
+                collection.find_one_and_update({"user_id": call.from_user.id},
+                                               {"$set": {f"settings.{index_of_chat}.afk.active": True, f"settings.{index_of_chat}.updated_date": get_msk_unix(), f"settings.{index_of_chat}.bot_send_afk": False}})
+            else:
+                collection.find_one_and_update({"user_id": call.from_user.id},
+                                               {"$set": {f"settings.{index_of_chat}.afk.active": False, f"settings.{index_of_chat}.updated_date": get_msk_unix(), f"settings.{index_of_chat}.bot_send_afk": False}})
+            await bot.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id,
+                                                reply_markup=generate_block_afk_show(call.from_user.id, index_of_chat))
         else:
             if db['settings'][index_of_chat]['block_ping']['active'] == False:
                 collection.find_one_and_update({"user_id": call.from_user.id},
@@ -498,21 +529,45 @@ async def show_blocked_resources(call: CallbackQuery):
         print(e)
 
 
+@dp.callback_query_handler(lambda call: call.data == 'vorchun_show')
+async def answer_to_vorchun_show(call: CallbackQuery):
+    try:
+        group_id_url = call.message.entities[0].url
+        group_id = "-" + re.sub(r"\D", "", group_id_url)
+        db = collection.find_one({"chats": group_id})
+        index_of_chat = get_dict_index(db, group_id)
+        text = f'Текст сообщения отсутствует 🤷‍♂'
+        if db['settings'][index_of_chat]['afk']['warning'] != 'None': text = db['settings'][index_of_chat]['afk']['warning']
+        await bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id, text=f'{t_settings.format(group_id=group_id, bot_user=t_bot_user, upd_time=update_time(db["settings"][index_of_chat]["updated_date"]))}\n\n<b>Функция "Ворчун":</b>\nЕсли в чате никто не пишет минут, то выводит сообщение:\n{text}', reply_markup=generate_block_afk_show(db['user_id'], index_of_chat))
+    except Exception as e:
+        print(e)
+
 @dp.callback_query_handler(lambda call: call.data == 'add_block_resources')
 async def react_to_add_block_resources(call: CallbackQuery):
-    await bot.delete_message(call.message.chat.id, call.message.message_id)
     group_id_url = call.message.entities[0].url
     group_id = int("-" + re.sub(r"\D", "", group_id_url))
-    quatback = await bot.send_message(call.message.chat.id, '📋 Введите доменные расширения, которые хотите заблокировать через запятую\n\nПример 1: ru\nПример 2: ru, com, io', reply_markup=generate_back_addblock())
+    db = collection.find_one({"user_id": call.from_user.id})
+    index_of_chat = get_dict_index(db, group_id)
+    blocks_list = 'Нету'
+    if len(db["settings"][index_of_chat]['block_resources']['r_list']) != 0: blocks_list = ', '.join(db["settings"][index_of_chat]['block_resources']['r_list'])
+    await bot.delete_message(call.message.chat.id, call.message.message_id)
+    quatback = await bot.send_message(call.message.chat.id, f'📋 Введите доменные расширения, которые хотите заблокировать через запятую\n\nПример 1: ru\nПример 2: ru, com, io\n\n<b>Ваш список запретов:</b> {blocks_list}', reply_markup=generate_back_addblock())
     collection.find_one_and_update({"user_id": call.from_user.id}, {"$set": {"chat_editing": group_id, "quatback": quatback.message_id}})
     await MySceneStates.blocked_resources_add.set()
 
 @dp.callback_query_handler(lambda call: call.data == 'remove_block_resources')
 async def react_to_add_block_resources(call: CallbackQuery):
-    await bot.delete_message(call.message.chat.id, call.message.message_id)
     group_id_url = call.message.entities[0].url
     group_id = int("-" + re.sub(r"\D", "", group_id_url))
-    quatback = await bot.send_message(call.message.chat.id, '📋 Введите доменные расширения, которые хотите удалить из заблокированных через запятую\n\nПример 1: ru\nПример 2: ru, com, io', reply_markup=generate_back_remblock())
+    db = collection.find_one({"user_id": call.from_user.id})
+    index_of_chat = get_dict_index(db, group_id)
+    blocks_list = 'Нету'
+    if len(db["settings"][index_of_chat]['block_resources']['r_list']) == 0:
+        return await call.answer('✋ У вас нет запретов в вашем списке, которых можно удалить!', show_alert=True)
+    else:
+        blocks_list = ', '.join(db["settings"][index_of_chat]['block_resources']['r_list'])
+    await bot.delete_message(call.message.chat.id, call.message.message_id)
+    quatback = await bot.send_message(call.message.chat.id, f'📋 Введите доменные расширения, которые хотите удалить из заблокированных через запятую\n\nПример 1: ru\nПример 2: ru, com, io\n\n<b>Ваш список запретов:</b> {blocks_list}', reply_markup=generate_back_remblock())
     collection.find_one_and_update({"user_id": call.from_user.id}, {"$set": {"chat_editing": group_id, "quatback": quatback.message_id}})
     await MySceneStates.blocked_resources_remove.set()
 
@@ -533,42 +588,280 @@ async def react_to_back_to_block_resources(call: CallbackQuery):
     except Exception as e:
         print(e)
 
+# СТАРЫЕ ПУНКТЫ
 
+@dp.callback_query_handler(lambda call: call.data == 'back_to_my_profil')
 @dp.callback_query_handler(lambda call: call.data == 'my_profile')
 async def show_profile(call: CallbackQuery):
     try:
-        db = collection.find_one({"user_id": call.from_user.id})
-        lic = 'Лицензии нет'
-        if db['lic'] != 'None': lic = db['lic']
-        await bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id,
-                                    text=f'👤 Ваш профиль:\n\n<b>Пользователь:</b> #{db["inlineid"]} - {db["register_data"]}\n<b>Username:</b> @{call.from_user.username}\n<b>Имя:</b> {call.from_user.first_name}\n<b>Чатов:</b> {len(db["chats"])}\n<b>Лицензий:</b> {db["lic"]}', reply_markup=generate_money_top_up())
-        await call.answer()
-    except Exception as e:
-        print(e)
-
-
-
-@dp.callback_query_handler(lambda call: call.data == 'back_to_my_profil')
-async def back_to_my_profil_reaction(call: CallbackQuery):
-    try:
-        await bot.delete_message(call.message.chat.id, call.message.message_id)
-        db = collection.find_one({"user_id": call.from_user.id})
-        lic = 'Лицензии нет'
-        if db['lic'] != 'None': lic = db['lic']
-        await bot.send_message(chat_id=call.message.chat.id,
-                                    text=f'👤 Ваш профиль:\n\n<b>Пользователь:</b> #{db["inlineid"]} - {db["register_data"]}\n<b>Username:</b> @{call.from_user.username}\n<b>Имя:</b> {call.from_user.first_name}\n<b>Чатов:</b> {len(db["chats"])}\n<b>Лицензий:</b> {db["lic"]}', reply_markup=generate_money_top_up())
-        await call.answer()
+        await show_start(call)
     except Exception as e:
         print(e)
 
 @dp.callback_query_handler(lambda call: call.data == 'back_to_main_page')
-async def show_profile(call: CallbackQuery):
+async def show_start(call: CallbackQuery):
     try:
-        await bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id,
-                                    text='Здравствуйте! Я бот-админ и могу администрировать ваш групповой чат.\n\nДля того чтобы начать, добавьте меня в свой групповой чат:', reply_markup=generate_add_button())
-        await call.answer()
+        db = collection.find_one({"user_id": call.from_user.id})
+        if len(db['chats']) >= 1:
+            lic = 'Лицензии нет'
+            if db['lic'] != 'None': lic = db['lic']
+            await bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id, text=f'👤 Ваш профиль:\n\n<b>Пользователь:</b> #{db["inlineid"]} - {db["register_data"]}\n<b>Username:</b> @{call.from_user.username}\n<b>Имя:</b> {call.from_user.first_name}\n<b>Чатов:</b> {len(db["chats"])}\n<b>Лицензий:</b> {db["lic"]}',
+                reply_markup=generate_add_button())
+        else:
+            await bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id, text=t_start_text.format(bot_user=t_bot_user),
+                reply_markup=generate_add_button())
     except Exception as e:
         print(e)
+
+@dp.callback_query_handler(lambda call: call.data == 'chat_users_info')
+async def answer_to_chat_users_info(call: CallbackQuery):
+    try:
+        group_id_url = call.message.entities[0].url
+        group_id = "-" + re.sub(r"\D", "", group_id_url)
+        db = collection.find_one({"chats": group_id})
+        index_of_chat = get_dict_index(db, group_id)
+        deleted_acc = 0
+        with_sym = 0
+        nonactive_7 = 0
+        nonactive_14 = 0
+        nonactive_30 = 0
+        nonactive_60 = 0
+        for user in db['settings'][index_of_chat]['users']:
+            try:
+                user_info = await bot.get_chat(user['id'])
+                if contains_external_links(user_info.first_name, db['settings'][index_of_chat]['blocked_syms']) == True or contains_external_links(user_info.last_name, db['settings'][index_of_chat]['blocked_syms']) == True:
+                    with_sym += 1
+            except ChatNotFound:
+                deleted_acc += 1
+                return
+            if days_since_unix_time(user['l_msg']) > 60:
+                nonactive_60 += 1
+            elif days_since_unix_time(user['l_msg']) > 30 and days_since_unix_time(user['l_msg']) < 60:
+                nonactive_30 += 1
+            elif days_since_unix_time(user['l_msg']) > 14 and days_since_unix_time(user['l_msg']) < 30:
+                nonactive_14 += 1
+            elif days_since_unix_time(user['l_msg']) > 7 and days_since_unix_time(user['l_msg']) < 14:
+                nonactive_7 += 1
+        await bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id, text=f'{t_settings.format(group_id=group_id, bot_user=t_bot_user, upd_time=update_time(db["settings"][index_of_chat]["updated_date"]))}\n\n<b>Статистика участников чата:</b>\n<b>Удаленныйх акаунтов:</b> {deleted_acc} участников\n<b>Участники с фильт-символами:</b> {with_sym} участников\n\n<b>Категории не активности:</b>\n<b>Не активны более 7 дней:</b> {nonactive_7} участников\n<b>Не активны более 14 дней:</b> {nonactive_14} участников\n<b>Не активны более 30 дней:</b> {nonactive_30} участников\n<b>Не активны более 60 дней:</b> {nonactive_60} участников\n', reply_markup=generaate_users_toda_actions())
+    except Exception as e:
+        print(e)
+
+@dp.callback_query_handler(lambda call: call.data == 'back_from_deletion')
+async def answer_to_back_from_deletion(call: CallbackQuery):
+    try:
+        await answer_to_chat_users_info(call)
+    except Exception as e:
+        print(e)
+
+@dp.callback_query_handler(lambda call: call.data == 'back_from_cat_chose')
+async def answer_to_back_from_cat_chose(call: CallbackQuery):
+    try:
+        await answer_to_chat_users_info(call)
+    except Exception as e:
+        print(e)
+
+@dp.callback_query_handler(lambda call: 'category' in call.data)
+async def answer_to_catgory(call: CallbackQuery):
+    try:
+        group_id_url = call.message.entities[0].url
+        group_id = "-" + re.sub(r"\D", "", group_id_url)
+        db = collection.find_one({"chats": group_id})
+        index_of_chat = get_dict_index(db, group_id)
+        data = call.data.split('_')[1]
+        if data == 'deleted':
+            collection.find_one_and_update({"chats": group_id}, {"$set": {"category": 'deleted'}})
+            await bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id,
+                                        text=f'{t_settings.format(group_id=group_id, bot_user=t_bot_user, upd_time=update_time(db["settings"][index_of_chat]["updated_date"]))}\n\nВыберите % удаления:', reply_markup=generaate_delete_percent())
+        elif data == 'symbol':
+            collection.find_one_and_update({"chats": group_id}, {"$set": {"category": 'symbol'}})
+            await bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id,
+                                        text=f'{t_settings.format(group_id=group_id, bot_user=t_bot_user, upd_time=update_time(db["settings"][index_of_chat]["updated_date"]))}\n\nВыберите % удаления:', reply_markup=generaate_delete_percent())
+        elif data == '7':
+            collection.find_one_and_update({"chats": group_id}, {"$set": {"category": '7'}})
+            await bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id,
+                                        text=f'{t_settings.format(group_id=group_id, bot_user=t_bot_user, upd_time=update_time(db["settings"][index_of_chat]["updated_date"]))}\n\nВыберите % удаления:', reply_markup=generaate_delete_percent())
+        elif data == '14':
+            collection.find_one_and_update({"chats": group_id}, {"$set": {"category": '14'}})
+            await bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id,
+                                        text=f'{t_settings.format(group_id=group_id, bot_user=t_bot_user, upd_time=update_time(db["settings"][index_of_chat]["updated_date"]))}\n\nВыберите % удаления:', reply_markup=generaate_delete_percent())
+        elif data == '30':
+            collection.find_one_and_update({"chats": group_id}, {"$set": {"category": '30'}})
+            await bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id,
+                                        text=f'{t_settings.format(group_id=group_id, bot_user=t_bot_user, upd_time=update_time(db["settings"][index_of_chat]["updated_date"]))}\n\nВыберите % удаления:', reply_markup=generaate_delete_percent())
+        elif data == '60':
+            collection.find_one_and_update({"chats": group_id}, {"$set": {"category": '60'}})
+            await bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id,
+                                        text=f'{t_settings.format(group_id=group_id, bot_user=t_bot_user, upd_time=update_time(db["settings"][index_of_chat]["updated_date"]))}\n\nВыберите % удаления:', reply_markup=generaate_delete_percent())
+    except Exception as e:
+        print(e)
+
+@dp.callback_query_handler(lambda call: 'catdelete' in call.data)
+async def answer_to_catdelete_percentage(call: CallbackQuery):
+    try:
+        group_id_url = call.message.entities[0].url
+        group_id = "-" + re.sub(r"\D", "", group_id_url)
+        db = collection.find_one({"chats": group_id})
+        index_of_chat = get_dict_index(db, group_id)
+        data = call.data.split('_')[1]
+        users_syms = []
+        users_deleted = []
+        users_7 = []
+        users_14 = []
+        users_30 = []
+        users_60 = []
+
+        msg = await bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id, text=f'{t_settings.format(group_id=group_id, bot_user=t_bot_user, upd_time=update_time(db["settings"][index_of_chat]["updated_date"]))}\n\nИдет удаление...')
+        for user in db['settings'][index_of_chat]['users']:
+            try:
+                user_info = await bot.get_chat(user['id'])
+                if contains_external_links(user_info.first_name, db['settings'][index_of_chat]['blocked_syms']) == True or contains_external_links(user_info.last_name, db['settings'][index_of_chat]['blocked_syms']) == True:
+                    users_syms.append(user['id'])
+            except ChatNotFound:
+                users_deleted.append(user['id'])
+                return
+            if days_since_unix_time(user['l_msg']) > 60:
+                users_60.append(user['id'])
+            elif days_since_unix_time(user['l_msg']) > 30 and days_since_unix_time(user['l_msg']) < 60:
+                users_30.append(user['id'])
+            elif days_since_unix_time(user['l_msg']) > 14 and days_since_unix_time(user['l_msg']) < 30:
+                users_14.append(user['id'])
+            elif days_since_unix_time(user['l_msg']) > 7 and days_since_unix_time(user['l_msg']) < 14:
+                users_7.append(user['id'])
+
+        if db['category'] == 'deleted':
+            if len(users_deleted) == 0: return await bot.edit_message_text(chat_id=call.message.chat.id,
+                                                                     message_id=msg.message_id,
+                                                                     text=f'{t_settings.format(group_id=group_id, bot_user=t_bot_user, upd_time=update_time(db["settings"][index_of_chat]["updated_date"]))}\n\nУдалены <b>0</b> участников чата ✅', reply_markup=generaate_back_from_deletion())
+            count_to_delete = (int(data) * len(users_deleted)) // 100
+            arr_with_users = trim_array(users_deleted, count_to_delete)
+            for i in arr_with_users:
+                try:
+                    await bot.kick_chat_member(chat_id=group_id, user_id=i)
+                    await bot.unban_chat_member(chat_id=group_id, user_id=i)
+                    index_of_user = get_chat_user_dict_index(db, i, index_of_chat)
+                    collection.find_one_and_update({'chats': group_id},
+                                                   {"$pull": {f'settings.{index_of_chat}.users.{index_of_user}.id': i}})
+                except Exception as e:
+                    print(e)
+            return await bot.edit_message_text(chat_id=call.message.chat.id,
+                                         message_id=msg.message_id,
+                                         text=f'{t_settings.format(group_id=group_id, bot_user=t_bot_user, upd_time=update_time(db["settings"][index_of_chat]["updated_date"]))}\n\nУдалены <b>{len(arr_with_users)}</b> участников чата ✅', reply_markup=generaate_back_from_deletion())
+        elif db['category'] == 'symbol':
+            if len(users_syms) == 0: return await bot.edit_message_text(chat_id=call.message.chat.id,
+                                                                     message_id=msg.message_id,
+                                                                     text=f'{t_settings.format(group_id=group_id, bot_user=t_bot_user, upd_time=update_time(db["settings"][index_of_chat]["updated_date"]))}\n\nУдалены <b>0</b> участников чата ✅', reply_markup=generaate_back_from_deletion())
+            count_to_delete = (int(data) * len(users_syms)) // 100
+            arr_with_users = trim_array(users_syms, count_to_delete)
+            for i in arr_with_users:
+                try:
+                    await bot.kick_chat_member(chat_id=group_id, user_id=i)
+                    await bot.unban_chat_member(chat_id=group_id, user_id=i)
+                    index_of_user = get_chat_user_dict_index(db, i, index_of_chat)
+                    collection.find_one_and_update({'chats': group_id},
+                                                   {"$pull": {f'settings.{index_of_chat}.users.{index_of_user}.id': i}})
+                except Exception as e:
+                    print(e)
+            return await bot.edit_message_text(chat_id=call.message.chat.id,
+                                         message_id=msg.message_id,
+                                         text=f'{t_settings.format(group_id=group_id, bot_user=t_bot_user, upd_time=update_time(db["settings"][index_of_chat]["updated_date"]))}\n\nУдалены <b>{len(arr_with_users)}</b> участников чата ✅',
+                                         reply_markup=generaate_back_from_deletion())
+        elif db['category'] == '7':
+            if len(users_7) == 0: return await bot.edit_message_text(chat_id=call.message.chat.id,
+                                                                     message_id=msg.message_id,
+                                                                     text=f'{t_settings.format(group_id=group_id, bot_user=t_bot_user, upd_time=update_time(db["settings"][index_of_chat]["updated_date"]))}\n\nУдалены <b>0</b> участников чата ✅', reply_markup=generaate_back_from_deletion())
+            count_to_delete = (int(data) * len(users_7)) // 100
+            arr_with_users = trim_array(users_7, count_to_delete)
+            for i in arr_with_users:
+                try:
+                    await bot.kick_chat_member(chat_id=group_id, user_id=i)
+                    await bot.unban_chat_member(chat_id=group_id, user_id=i)
+                    index_of_user = get_chat_user_dict_index(db, i, index_of_chat)
+                    collection.find_one_and_update({'chats': group_id},
+                                                   {"$pull": {f'settings.{index_of_chat}.users.{index_of_user}.id': i}})
+                except Exception as e:
+                    print(e)
+            return await bot.edit_message_text(chat_id=call.message.chat.id,
+                                         message_id=msg.message_id,
+                                         text=f'{t_settings.format(group_id=group_id, bot_user=t_bot_user, upd_time=update_time(db["settings"][index_of_chat]["updated_date"]))}\n\nУдалены <b>{len(arr_with_users)}</b> участников чата ✅',
+                                         reply_markup=generaate_back_from_deletion())
+        elif db['category'] == '14':
+            if len(users_14) == 0: return await bot.edit_message_text(chat_id=call.message.chat.id,
+                                                                     message_id=msg.message_id,
+                                                                     text=f'{t_settings.format(group_id=group_id, bot_user=t_bot_user, upd_time=update_time(db["settings"][index_of_chat]["updated_date"]))}\n\nУдалены <b>0</b> участников чата ✅', reply_markup=generaate_back_from_deletion())
+            count_to_delete = (int(data) * len(users_14)) // 100
+            arr_with_users = trim_array(users_14, count_to_delete)
+            for i in arr_with_users:
+                try:
+                    await bot.kick_chat_member(chat_id=group_id, user_id=i)
+                    await bot.unban_chat_member(chat_id=group_id, user_id=i)
+                    index_of_user = get_chat_user_dict_index(db, i, index_of_chat)
+                    collection.find_one_and_update({'chats': group_id},
+                                                   {"$pull": {f'settings.{index_of_chat}.users.{index_of_user}.id': i}})
+                except Exception as e:
+                    print(e)
+            return await bot.edit_message_text(chat_id=call.message.chat.id,
+                                         message_id=msg.message_id,
+                                         text=f'{t_settings.format(group_id=group_id, bot_user=t_bot_user, upd_time=update_time(db["settings"][index_of_chat]["updated_date"]))}\n\nУдалены <b>{len(arr_with_users)}</b> участников чата ✅',
+                                         reply_markup=generaate_back_from_deletion())
+        elif db['category'] == '30':
+            if len(users_30) == 0: return await bot.edit_message_text(chat_id=call.message.chat.id,
+                                                                     message_id=msg.message_id,
+                                                                     text=f'{t_settings.format(group_id=group_id, bot_user=t_bot_user, upd_time=update_time(db["settings"][index_of_chat]["updated_date"]))}\n\nУдалены <b>0</b> участников чата ✅', reply_markup=generaate_back_from_deletion())
+            count_to_delete = (int(data) * len(users_30)) // 100
+            arr_with_users = trim_array(users_30, count_to_delete)
+            for i in arr_with_users:
+                try:
+                    await bot.kick_chat_member(chat_id=group_id, user_id=i)
+                    await bot.unban_chat_member(chat_id=group_id, user_id=i)
+                    index_of_user = get_chat_user_dict_index(db, i, index_of_chat)
+                    collection.find_one_and_update({'chats': group_id},
+                                                   {"$pull": {f'settings.{index_of_chat}.users.{index_of_user}.id': i}})
+                except Exception as e:
+                    print(e)
+            return await bot.edit_message_text(chat_id=call.message.chat.id,
+                                         message_id=msg.message_id,
+                                         text=f'{t_settings.format(group_id=group_id, bot_user=t_bot_user, upd_time=update_time(db["settings"][index_of_chat]["updated_date"]))}\n\nУдалены <b>{len(arr_with_users)}</b> участников чата ✅',
+                                         reply_markup=generaate_back_from_deletion())
+        elif db['category'] == '60':
+            if len(users_60) == 0: return await bot.edit_message_text(chat_id=call.message.chat.id,
+                                                                     message_id=msg.message_id,
+                                                                     text=f'{t_settings.format(group_id=group_id, bot_user=t_bot_user, upd_time=update_time(db["settings"][index_of_chat]["updated_date"]))}\n\nУдалены <b>0</b> участников чата ✅', reply_markup=generaate_back_from_deletion())
+            count_to_delete = (int(data) * len(users_60)) // 100
+            arr_with_users = trim_array(users_60, count_to_delete)
+            for i in arr_with_users:
+                try:
+                    await bot.kick_chat_member(chat_id=group_id, user_id=i)
+                    await bot.unban_chat_member(chat_id=group_id, user_id=i)
+                    index_of_user = get_chat_user_dict_index(db, i, index_of_chat)
+                    collection.find_one_and_update({'chats': group_id}, {"$pull": {f'settings.{index_of_chat}.users.{index_of_user}.id': i}})
+                except Exception as e:
+                    print(e)
+
+            return await bot.edit_message_text(chat_id=call.message.chat.id,
+                                         message_id=msg.message_id,
+                                         text=f'{t_settings.format(group_id=group_id, bot_user=t_bot_user, upd_time=update_time(db["settings"][index_of_chat]["updated_date"]))}\n\nУдалены <b>{len(arr_with_users)}</b> участников чата ✅',
+                                         reply_markup=generaate_back_from_deletion())
+    except Exception as e:
+        print(e)
+
+@dp.callback_query_handler(lambda call: call.data == 'back_from_percent')
+async def answer_to_back_from_percent(call: CallbackQuery):
+    try:
+        await answer_to_delete_users_from_cat(call)
+    except Exception as e:
+        print(e)
+
+@dp.callback_query_handler(lambda call: call.data == 'delete_users_from_cat')
+async def answer_to_delete_users_from_cat(call: CallbackQuery):
+    try:
+        group_id_url = call.message.entities[0].url
+        group_id = "-" + re.sub(r"\D", "", group_id_url)
+        db = collection.find_one({"chats": group_id})
+        index_of_chat = get_dict_index(db, group_id)
+        await bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id, text=f'{t_settings.format(group_id=group_id, bot_user=t_bot_user, upd_time=update_time(db["settings"][index_of_chat]["updated_date"]))}\n\n<b>Выберите категорию с которой хотите удалить участников:</b>', reply_markup=generaate_users_toda_categories())
+    except Exception as e:
+        print(e)
+
 
 @dp.callback_query_handler(lambda call: call.data == 'show_my_chats')
 async def show_my_chats(call: CallbackQuery):
@@ -650,9 +943,7 @@ async def react_to_money_top_up(call: CallbackQuery):
         positions = sorted(unsortedp, key=lambda x: int(x['period']))
         for i in positions:
             prices += f'💎 {i["period"]} дней – {i["price"]}₽\n'
-        await bot.delete_message(chat_id=call.message.chat.id, message_id=call.message.message_id)
-        await bot.send_message(chat_id=call.message.chat.id,
-                             text=f'<a href="https://{group_id}.id">🛒</a> <b>Прайс-лист лицензий:</b>\n{prices}', reply_markup=generate_payment_page())
+        await bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id, text=f'<a href="https://{group_id}.id">🛒</a> <b>Прайс-лист лицензий:</b>\n{prices}', reply_markup=generate_payment_page())
     except Exception as e:
         print(e)
 

@@ -1,5 +1,7 @@
 # Обработчики текстовых данных:
 import asyncio
+import json
+
 from data.loader import bot, dp, FSMContext, State, Message, config
 from database.database import collection, ObjectId
 from states_scenes.scene import MySceneStates
@@ -18,26 +20,22 @@ async def new_chat_member_greatings(ctx: Message):
     try:
         if ctx['new_chat_member']['is_bot'] == True: return
         db = collection.find_one({"chats": f"{ctx.chat.id}"})
+        if db == None: return
         index_of_chat = get_dict_index(db, ctx.chat.id)
+        settings_of_chat = db['settings'][index_of_chat]
+        if 'users' not in settings_of_chat: collection.find_one_and_update({"chats": f"{ctx.chat.id}"}, {"$set": {f'settings.{index_of_chat}.users': []}})
 
         if db['settings'][index_of_chat]['system_notice']['active'] == True:
             await ctx.delete()
 
         member_name = ctx["new_chat_member"]["first_name"]
 
-        trash = ''
-        if db['settings'][index_of_chat]['greeting'] == 'None':
-            trash = await ctx.answer(f"Приветствуем, <b>{member_name}</b>!\n\nПрежде чем размещать свои объявления, пожалуйста, ознакомься с правилами. Они доступны по команде /rules")
-        else:
-            text_from_db = db['settings'][index_of_chat]['greeting']
-            text = ''
-            if '{member_name}' in text_from_db:
-                text = text_from_db.replace("{member_name}", member_name)
-            else:
-                text = text_from_db
+        text = f"Приветствуем, <b>{member_name}</b>!\n\nПрежде чем размещать свои объявления, пожалуйста, ознакомься с правилами. Они доступны по команде /rules"
+        if db['settings'][index_of_chat]['greeting'] != 'None':
+            text = db['settings'][index_of_chat]['greeting'].replace("{member_name}", member_name)
 
-            trash = await ctx.answer(text)
-
+        trash = await ctx.answer(text)
+        collection.find_one_and_update({"chats": f"{ctx.chat.id}"}, {"$push": {f'settings.{index_of_chat}.users': {"id": ctx["new_chat_member"]["id"], 'l_msg': 'None'}}})
         asyncio.create_task(delete_message(30, [trash.message_id], ctx.chat.id))
     except Exception as e:
         print(e)
@@ -46,10 +44,15 @@ async def new_chat_member_greatings(ctx: Message):
 async def left_chat_member(ctx: Message):
     try:
         db = collection.find_one({"chats": f"{ctx.chat.id}"})
+        if db == None: return
         index_of_chat = get_dict_index(db, ctx.chat.id)
-
+        settings_of_chat = db['settings'][index_of_chat]
+        if 'users' not in settings_of_chat: collection.find_one_and_update({"chats": f"{ctx.chat.id}"}, {
+            "$set": {f'settings.{index_of_chat}.users': []}})
         if db['settings'][index_of_chat]['system_notice']['active'] == True:
             await ctx.delete()
+        collection.find_one_and_update({"chats": f"{ctx.chat.id}"},
+                                       {"$pull": {f'settings.{index_of_chat}.users': {"id": ctx["left_chat_participant"]["id"]}}})
     except Exception as e:
         print(e)
 
@@ -103,24 +106,26 @@ async def afk_scene(ctx: Message, state: FSMContext):
         db = collection.find_one({"user_id": ctx.from_user.id})
         group_id = db['chat_editing']
         index_of_chat = get_dict_index(db, group_id)
-        collection.find_one_and_update({"user_id": ctx.from_user.id}, {"$set": {f"settings.{index_of_chat}.afk": ctx.text, f"settings.{index_of_chat}.updated_date": get_msk_unix()}})
+        collection.find_one_and_update({"user_id": ctx.from_user.id}, {"$set": {f"settings.{index_of_chat}.afk.warning": ctx.text, f"settings.{index_of_chat}.updated_date": get_msk_unix()}})
         db = collection.find_one({"user_id": ctx.from_user.id})
         try:
             await bot.delete_message(ctx.chat.id, db['quatback'])
         except:
             print('err - scene deletion (NOT Important)')
         await bot.send_message(ctx.chat.id, text=f'Успешное изменение ✅')
+        text = f'Текст сообщения отсутствует 🤷‍♂'
+        if db['settings'][index_of_chat]['afk']['warning'] != 'None': text = db['settings'][index_of_chat]['afk']['warning']
         await state.finish()
-        sleep(2)
-        await bot.send_message(ctx.chat.id, text=f'{t_settings.format(group_id=group_id, bot_user=t_bot_user, upd_time=update_time(db["settings"][index_of_chat]["updated_date"]))}\n\nВыберите текст, который хотите посмотреть:',
-                                    reply_markup=generate_edit_text_settings())
+        await asyncio.sleep(2)
+        await bot.send_message(ctx.chat.id, text=f'{t_settings.format(group_id=group_id, bot_user=t_bot_user, upd_time=update_time(db["settings"][index_of_chat]["updated_date"]))}\n\n<b>Функция "Ворчун":</b>\nЕсли в чате никто не пишет минут, то выводит сообщение:\n{text}',
+                                    reply_markup=generate_block_afk_show(db['user_id'], index_of_chat))
     except Exception as e:
         print(e)
 
 @dp.message_handler(content_types=['text'], state=MySceneStates.blocked_resources_add)
 async def blocked_resources_add_scene(ctx: Message, state: FSMContext):
     try:
-        domains_array = ctx.text.replace('.', '').replace(' ', '').split(',')
+        domains_array = ctx.text.replace(' ', '').split(',')
         db = collection.find_one({"user_id": ctx.from_user.id})
         group_id = db['chat_editing']
         index_of_chat = get_dict_index(db, group_id)
@@ -129,6 +134,8 @@ async def blocked_resources_add_scene(ctx: Message, state: FSMContext):
 
         for i in domains_array:
             try:
+                if i in db['settings'][index_of_chat]['block_resources']['r_list']: return await ctx.answer(
+                    '✋ Вы пытаетесь добавить уже существующий запрет, введите запрет, которого нет в вашем списке:')
                 collection.find_one_and_update({"user_id": ctx.from_user.id},
                                                {'$push': {f'settings.{index_of_chat}.block_resources.r_list': i}, '$set': {f"settings.{index_of_chat}.updated_date": get_msk_unix()}})
             except Exception as e:
@@ -150,13 +157,14 @@ async def blocked_resources_add_scene(ctx: Message, state: FSMContext):
 @dp.message_handler(content_types=['text'], state=MySceneStates.blocked_resources_remove)
 async def blocked_resources_remove_scene(ctx: Message, state: FSMContext):
     try:
-        domains_array = ctx.text.replace('.', '').replace(' ', '').split(',')
+        domains_array = ctx.text.replace(' ', '').split(',')
         db = collection.find_one({"user_id": ctx.from_user.id})
         group_id = db['chat_editing']
         index_of_chat = get_dict_index(db, group_id)
 
         for i in domains_array:
             try:
+                if i not in db['settings'][index_of_chat]['block_resources']['r_list']: return await ctx.answer('✋ Вы пытаетесь удалить несуществующий запрет, введите запрет, который есть в вашем списке:')
                 collection.find_one_and_update({"user_id": ctx.from_user.id},
                                                {'$pull': {f'settings.{index_of_chat}.block_resources.r_list': i}, "$set": {f"settings.{index_of_chat}.updated_date": get_msk_unix()}})
             except Exception as e:
@@ -318,16 +326,21 @@ async def pingw_change_text(ctx: Message, state: FSMContext):
 @dp.message_handler(content_types=['text'])
 async def message_staff(ctx: Message):
     try:
-        print(collection.find_one({"_id": ObjectId('64987b1eeed9918b13b0e8b4')}))
+        # print(collection.find_one({"_id": ObjectId('64987b1eeed9918b13b0e8b4')}))
         if ctx.chat.type == 'group' or ctx.chat.type == 'supergroup':
             db = collection.find_one({"chats": f'{ctx.chat.id}'})
             if db == None: return
             index_of_chat = get_dict_index(db, ctx.chat.id)
-
+            settings_of_chat = db['settings'][index_of_chat]
+            if 'users' not in settings_of_chat: collection.find_one_and_update({"chats": f"{ctx.chat.id}"}, {
+                "$set": {f'settings.{index_of_chat}.users': []}})
             users_count = await bot.get_chat_members_count(ctx.chat.id)
-            collection.find_one_and_update({'chats': f'{ctx.chat.id}'}, {
+            db = collection.find_one_and_update({'chats': f'{ctx.chat.id}'}, {
                 "$set": {f"settings.{index_of_chat}.last_msg": datetime.now().strftime('%H:%M:%S'),
-                         f"settings.{index_of_chat}.users_count": users_count}})
+                         f"settings.{index_of_chat}.users_count": users_count, f"settings.{index_of_chat}.bot_send_afk": False}})
+            get_user = get_chat_user_dict_index(db, ctx.from_user.id, index_of_chat)
+            if get_user == None: collection.find_one_and_update({'chats': f'{ctx.chat.id}'}, {"$push": {f'settings.{index_of_chat}.users': {"id": ctx.from_user.id, 'l_msg': get_msk_unix()}}})
+            else: collection.find_one_and_update({'chats': f'{ctx.chat.id}'}, {"$set": {f'settings.{index_of_chat}.users.{get_user}.l_msg': get_msk_unix()}})
             adb = collection.find_one({"_id": ObjectId('64987b1eeed9918b13b0e8b4')})
             if users_count > adb['limit_to_users'] and db['user_id'] not in adb['admins'] and db['user_id'] != int(config['MAIN_ADMIN_ID']) and db['settings'][index_of_chat]['lic'] == False:
                 return await bot.send_message(db['user_id'], f'Вы превысили Бесплатный лимит подписчиков на группу. Чтобы продолжить использовать бота, необходимо приобрести лицензию на чат в настройках чата - <b>{ctx.chat.title}</b>', reply_markup=generate_mychats_button(), disable_notification=False)

@@ -6,12 +6,12 @@ from data.texts import t_bot_user
 
 def generate_add_button():
     markup = InlineKeyboardMarkup()
-    add_bottogroup_btn = InlineKeyboardButton('➕ Добавить бота в свой чат', url=f'https://t.me/{t_bot_user}?startgroup=true')
-    my_profile_btn = InlineKeyboardButton('👤 Мой профиль', callback_data='my_profile')
+    add_bottogroup_btn = InlineKeyboardButton('➕ Добавить группу', url=f'https://t.me/{t_bot_user}?startgroup=true')
     my_groups_btn = InlineKeyboardButton('🗃️ Мои чаты', callback_data='show_my_chats')
+    donate_btn = InlineKeyboardButton('💰 Поддержать донатом', callback_data='donate')
     markup.add(add_bottogroup_btn)
-    markup.add(my_profile_btn)
     markup.add(my_groups_btn)
+    markup.add(donate_btn)
     return markup
 
 def generate_mychats_button():
@@ -43,11 +43,13 @@ def generate_settings(lic=False):
     markup = InlineKeyboardMarkup()
     edit_texts_btn = InlineKeyboardButton('✍ Изменение текста', callback_data='settings_texts')
     edit_admin_btn = InlineKeyboardButton('🧑‍⚖ Настройки администрирования', callback_data='settings_admins')
+    users_info_btn = InlineKeyboardButton('📊 Статистика участников', callback_data='chat_users_info')
     buy_lic_btn = InlineKeyboardButton('💎 Купить лицензию', callback_data='money_top_up')
     lic_info_btn = InlineKeyboardButton('ℹ Информация о лицензии', callback_data='lic_info')
     done_btn = InlineKeyboardButton('✅ Готово', callback_data='done_btn')
     markup.add(edit_admin_btn)
     markup.add(edit_texts_btn)
+    markup.add(users_info_btn)
     if lic == False: markup.add(buy_lic_btn)
     else: markup.add(lic_info_btn)
     markup.add(done_btn)
@@ -99,14 +101,6 @@ def generate_warning_editing_page():
     markup.add(back_btn)
     return markup
 
-def generate_afk_editing_page():
-    markup = InlineKeyboardMarkup()
-    edit_afk_btn = InlineKeyboardButton('✍ Изменить текст неактивности', callback_data='edit_afk')
-    back_btn = InlineKeyboardButton('⏪ Назад', callback_data='back_to_show_page')
-    markup.add(edit_afk_btn)
-    markup.add(back_btn)
-    return markup
-
 def generate_admins_settings():
     markup = InlineKeyboardMarkup()
     block_resources_show_btn = InlineKeyboardButton('🌐 Блок внешних ссылок', callback_data='block_resources_show')
@@ -115,12 +109,65 @@ def generate_admins_settings():
     block_repostes_show_btn = InlineKeyboardButton('📩 Запрет репостов', callback_data='block_repostes_show')
     block_ping_show_btn = InlineKeyboardButton('🔕 Запрет пинга', callback_data='block_ping_show')
     format_btn = InlineKeyboardButton('💬 Форматирование', callback_data='formating')
-
+    vorchun_btn = InlineKeyboardButton('🗣️ Ворчун', callback_data='vorchun_show')
 
     back_btn = InlineKeyboardButton('⏪ Назад', callback_data='back_to_chose')
     markup.add(block_resources_show_btn, system_notice_show_btn)
     markup.add(block_repostes_show_btn, format_btn)
-    markup.add(block_ping_show_btn, back_btn)
+    markup.add(block_ping_show_btn, vorchun_btn)
+    markup.add(back_btn)
+    return markup
+
+def generaate_users_toda_actions():
+    markup = InlineKeyboardMarkup()
+    remove_btn = InlineKeyboardButton('🗑️ Удаление из категорий', callback_data='delete_users_from_cat')
+    filter_show_btn = InlineKeyboardButton('🔣 Фильтр символов', callback_data='filter_show')
+    back_btn = InlineKeyboardButton('⏪ Назад', callback_data='back_to_chose')
+    markup.add(remove_btn)
+    markup.add(filter_show_btn)
+    markup.add(back_btn)
+    return markup
+
+def generaate_back_from_deletion():
+    markup = InlineKeyboardMarkup()
+    back_btn = InlineKeyboardButton('⏪ Назад', callback_data='back_from_deletion')
+    markup.add(back_btn)
+    return markup
+
+def generaate_users_toda_categories():
+    markup = InlineKeyboardMarkup()
+    deleteds_btn = InlineKeyboardButton('👻 Удаленные аккаунты', callback_data='category_deleted')
+    symbol_btn = InlineKeyboardButton('🔣 Участники попадающие под фильтр', callback_data='category_symbol')
+    nonactive_7_btn = InlineKeyboardButton('🟠 Не активны более 7  д', callback_data='category_7')
+    nonactive_14_btn = InlineKeyboardButton('🟠 Не активны более 14 д', callback_data='category_14')
+    nonactive_30_btn = InlineKeyboardButton('🟠 Не активны более 30 д', callback_data='category_30')
+    nonactive_60_btn = InlineKeyboardButton('🟠 Не активны более 60 д', callback_data='category_60')
+    back_btn = InlineKeyboardButton('⏪ Назад', callback_data='back_from_cat_chose')
+    markup.add(deleteds_btn)
+    markup.add(symbol_btn)
+    markup.add(nonactive_7_btn)
+    markup.add(nonactive_14_btn)
+    markup.add(nonactive_30_btn)
+    markup.add(nonactive_60_btn)
+    markup.add(back_btn)
+    return markup
+
+def generaate_delete_percent():
+    markup = InlineKeyboardMarkup()
+    delete_10_btn = InlineKeyboardButton('🔹 Удалить 10%', callback_data='catdelete_10')
+    delete_20_btn = InlineKeyboardButton('🔹 Удалить 20%', callback_data='catdelete_20')
+    delete_30_btn = InlineKeyboardButton('🔹 Удалить 30%', callback_data='catdelete_30')
+    delete_40_btn = InlineKeyboardButton('🔹 Удалить 40%', callback_data='catdelete_40')
+    delete_50_btn = InlineKeyboardButton('🔹 Удалить 50%', callback_data='catdelete_50')
+    delete_100_btn = InlineKeyboardButton('💯 Удалить 100%', callback_data='catdelete_100')
+    back_btn = InlineKeyboardButton('⏪ Назад', callback_data='back_from_percent')
+    markup.add(delete_10_btn)
+    markup.add(delete_20_btn)
+    markup.add(delete_30_btn)
+    markup.add(delete_40_btn)
+    markup.add(delete_50_btn)
+    markup.add(delete_100_btn)
+    markup.add(back_btn)
     return markup
 
 def generate_block_resources_show(user_id, chat_index):
@@ -186,11 +233,18 @@ def generate_block_ping_show(user_id, chat_index):
     markup.add(back_btn)
     return markup
 
-def generate_money_top_up():
+def generate_block_afk_show(user_id, chat_index):
     markup = InlineKeyboardMarkup()
-    money_top_up_btn = InlineKeyboardButton('💰 Отправить донат', callback_data='money_top_up')
-    back_btn = InlineKeyboardButton('⏪ Назад', callback_data='back_to_main_page')
-    markup.add(money_top_up_btn)
+    db = collection.find_one({"user_id": user_id})
+    status = '🔴 | Выключено'
+    if db['settings'][chat_index]['afk']['active'] == True:
+        status = '🟢 | Включено '
+
+    activate_btn = InlineKeyboardButton(status, callback_data='activator_afk')
+    edit_pingw_btn = InlineKeyboardButton('📝 Изменить текст', callback_data='edit_afkw')
+    back_btn = InlineKeyboardButton('⏪ Назад', callback_data='back_to_admin_page')
+    markup.add(activate_btn)
+    markup.add(edit_pingw_btn)
     markup.add(back_btn)
     return markup
 
@@ -335,7 +389,7 @@ def generate_back_to_profil():
 
 def generate_admin_limit_edit_choice():
     markup = InlineKeyboardMarkup()
-    limit_to_users_edit_btn = InlineKeyboardButton('📝 Лимит пользователей на чат', callback_data='aedit_limittousers')
+    limit_to_users_edit_btn = InlineKeyboardButton('📝 Изменить ограничение', callback_data='aedit_limittousers')
     back_btn = InlineKeyboardButton('⏪ Назад', callback_data='back_from_edit_limits')
     markup.add(limit_to_users_edit_btn)
     markup.add(back_btn)
@@ -430,5 +484,11 @@ def generate_back_kickedittext():
 def generate_back_unbanedittext():
     markup = InlineKeyboardMarkup()
     back = InlineKeyboardButton('⏪ Назад', callback_data='eback_unbanedittext')
+    markup.add(back)
+    return markup
+
+def generate_back_afkedittext():
+    markup = InlineKeyboardMarkup()
+    back = InlineKeyboardButton('⏪ Назад', callback_data='eback_afkedittext')
     markup.add(back)
     return markup

@@ -1,69 +1,12 @@
 from data.loader import bot, dp, FSMContext, State, Message, config
 from data.configs import delete_message, resolve_username_to_user_id
+from data.texts import *
 from aiogram.types import CallbackQuery, ContentTypes
 from database.database import collection, ObjectId
 from states_scenes.scene import MySceneStates
-from keyboards.inline_keyboards import generate_positedit, generate_eidit_positions, generate_admin_return_main, generate_delete_positions, generate_admin_price_edit_choice, generate_admin_limit_edit_choice, generate_admin_main_page, generate_add_button, generate_admin_return
+from keyboards.inline_keyboards import *
 import asyncio
 import re
-
-@dp.message_handler(commands=['admin'])
-async def react_to_admin(ctx: Message):
-    try:
-        await ctx.delete()
-        db = collection.find_one({'_id': ObjectId('64987b1eeed9918b13b0e8b4')})
-        if ctx.from_user.id not in db['admins'] and ctx.from_user.id != int(config['MAIN_ADMIN_ID']): return await ctx.answer('🔒')
-        await ctx.answer(f'Добро пожаловать в админку, <a href="tg://user?id={ctx.from_user.id}">{ctx.from_user.first_name}</a>', reply_markup=generate_admin_main_page())
-    except Exception as e:
-        print(e)
-
-@dp.callback_query_handler(lambda call: call.data == 'admin_exit')
-async def answer_to_admin_exit(call: CallbackQuery):
-    try:
-        await call.answer('😜 До новых встреч!')
-        await bot.delete_message(call.message.chat.id, call.message.message_id)
-        await bot.send_message(call.message.chat.id, 'Здравствуйте! Я бот-админ и могу администрировать ваш групповой чат.\n\nДля того чтобы начать, добавьте меня в свой групповой чат:', reply_markup=generate_add_button())
-    except Exception as e:
-        print(e)
-
-@dp.callback_query_handler(lambda call: call.data == 'admin_add')
-async def answer_to_admin_add(call: CallbackQuery):
-    try:
-        await call.answer()
-        await bot.delete_message(call.message.chat.id, call.message.message_id)
-        await bot.send_message(call.message.chat.id, '👮 Введите юзернейм или прямую сслку на пользователя:')
-        await MySceneStates.add_admin.set()
-    except Exception as e:
-        print(e)
-
-@dp.callback_query_handler(lambda call: call.data == 'admin_post')
-async def answer_to_admin_post(call: CallbackQuery):
-    try:
-        await call.answer()
-        await bot.delete_message(call.message.chat.id, call.message.message_id)
-        await bot.send_message(call.message.chat.id, '💬 Отправьте сообщение, которое хотите отправить всем пользователям своего бота:')
-        await MySceneStates.post_to_users.set()
-    except Exception as e:
-        print(e)
-
-@dp.callback_query_handler(lambda call: call.data == 'admin_bot_stats')
-async def answer_to_admin_stats(call: CallbackQuery):
-    try:
-        db = collection.find_one({'_id': ObjectId('64987b1eeed9918b13b0e8b4')})
-        await call.answer()
-        await bot.edit_message_text(text=f'📊 Общая статистика бота:\n\n<b>Кол-во пользователей:</b> {len(db["users"])}\n<b>Кол-во чатов с ботом:</b> {len(db["groups"])}\n<b>Кол-во купленных лицензий за все время:</b> {db["lics_buyed"]}\n<b>Кол-во заработанных денег за все время:</b> {db["earned"]}₽\n<b>Кол-во чатов с лицензией:</b> {len(db["chat_with_lics"])}', chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=generate_admin_return())
-    except Exception as e:
-        print(e)
-
-
-@dp.callback_query_handler(lambda call: call.data == 'admin_stats_back')
-async def answer_to_admin_back(call: CallbackQuery):
-    try:
-        await call.answer()
-        await bot.edit_message_text(text=f'Добро пожаловать в админку, <a href="tg://user?id={call.from_user.id}">{call.from_user.first_name}</a>', chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=generate_admin_main_page())
-    except Exception as e:
-        print(e)
-
 
 @dp.callback_query_handler(lambda call: call.data == 'admin_edit_money')
 async def answer_to_admin_emoney(call: CallbackQuery):
@@ -78,18 +21,84 @@ async def answer_to_admin_emoney(call: CallbackQuery):
                                        text=f'💎 <b>Прайс-лист:</b>\n{prices}\nВыберите действие:',
                                        reply_markup=generate_admin_price_edit_choice())
     except Exception as e:
-        print(e)
+        print('Error в answer_to_admin_emoney:' + f'{e}')
 
 @dp.callback_query_handler(lambda call: call.data == 'admin_edit_limits')
-async def answer_to_admin_elimits(call: CallbackQuery):
+async def answer_to_admin_elimit(call: CallbackQuery):
     try:
         db = collection.find_one({"_id": ObjectId('64987b1eeed9918b13b0e8b4')})
-        await bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id, text=f'✋ <b>Лимиты:</b>\n<b>Лимит количества пользователей на чат:</b> {db["limit_to_users"]}\n\nВыберите лимит который хотите изменить:', reply_markup=generate_admin_limit_edit_choice())
+        await bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id,
+                                    text=f'✋ <b>Лимиты:</b>\n\n<b>Демо режим до:</b> {db["limit_to_users"]} юзеров',
+                                    reply_markup=generate_admin_limit_edit_choice())
     except Exception as e:
-        print(e)
+        print('Error в answer_to_admin_elimit:' + f'{e}')
 
-# [{'period': '180', 'price': 180.0}, {'period': '365', 'price': 350.0}, {'period': '90', 'price': 90.0}, {'period': '30', 'price': 30.0}]
-# collection.find_one_and_update({"_id": ObjectId('64987b1eeed9918b13b0e8b4')}, {"$set": {"price": [{'period': '180', 'price': 180.0}, {'period': '365', 'price': 350.0}, {'period': '90', 'price': 90.0}, {'period': '30', 'price': 30.0}]}})
+@dp.message_handler(commands=['admin'])
+async def react_to_admin(ctx: Message):
+    try:
+        print('adadad')
+        await ctx.delete()
+        db = collection.find_one({'_id': ObjectId('64987b1eeed9918b13b0e8b4')})
+        if ctx.from_user.id not in db['admins'] and ctx.from_user.id != int(config['MAIN_ADMIN_ID']): return await ctx.answer('🔒')
+        await ctx.answer(f'Добро пожаловать в админку, <a href="tg://user?id={ctx.from_user.id}">{ctx.from_user.first_name}</a>', reply_markup=generate_admin_main_page())
+    except Exception as e:
+        print('Error в react_to_admin:' + f'{e}')
+
+@dp.callback_query_handler(lambda call: call.data == 'admin_exit')
+async def answer_to_admin_exit(call: CallbackQuery):
+    try:
+        await call.answer('😜 До новых встреч!')
+        db = collection.find_one({"user_id": call.from_user.id})
+        if len(db['chats']) >= 1:
+            lic = 'Лицензии нет'
+            if db['lic'] != 'None': lic = db['lic']
+            await bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id,
+                                        text=f'👤 Ваш профиль:\n\n<b>Пользователь:</b> #{db["inlineid"]} - {db["register_data"]}\n<b>Username:</b> @{call.from_user.username}\n<b>Имя:</b> {call.from_user.first_name}\n<b>Чатов:</b> {len(db["chats"])}\n<b>Лицензий:</b> {db["lic"]}',
+                                        reply_markup=generate_add_button())
+        else:
+            await bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id,
+                                        text=t_start_text.format(bot_user=t_bot_user),
+                                        reply_markup=generate_add_button())
+    except Exception as e:
+        print('Error в answer_to_admin_exit:' + f'{e}')
+
+@dp.callback_query_handler(lambda call: call.data == 'admin_add')
+async def answer_to_admin_add(call: CallbackQuery):
+    try:
+        await call.answer()
+        await bot.delete_message(call.message.chat.id, call.message.message_id)
+        await bot.send_message(call.message.chat.id, '👮 Введите юзернейм или прямую сслку на пользователя:')
+        await MySceneStates.add_admin.set()
+    except Exception as e:
+        print('Error в answer_to_admin_add:' + f'{e}')
+
+@dp.callback_query_handler(lambda call: call.data == 'admin_post')
+async def answer_to_admin_post(call: CallbackQuery):
+    try:
+        await call.answer()
+        await bot.delete_message(call.message.chat.id, call.message.message_id)
+        await bot.send_message(call.message.chat.id, '💬 Отправьте сообщение, которое хотите отправить всем пользователям своего бота:')
+        await MySceneStates.post_to_users.set()
+    except Exception as e:
+        print('Error в answer_to_admin_post:' + f'{e}')
+
+@dp.callback_query_handler(lambda call: call.data == 'admin_bot_stats')
+async def answer_to_admin_stats(call: CallbackQuery):
+    try:
+        db = collection.find_one({'_id': ObjectId('64987b1eeed9918b13b0e8b4')})
+        await call.answer()
+        await bot.edit_message_text(text=f'📊 Общая статистика бота:\n\n<b>Кол-во пользователей:</b> {len(db["users"])}\n<b>Кол-во чатов с ботом:</b> {len(db["groups"])}\n<b>Кол-во купленных лицензий за все время:</b> {db["lics_buyed"]}\n<b>Кол-во заработанных денег за все время:</b> {db["earned"]}₽\n<b>Кол-во чатов с лицензией:</b> {len(db["chat_with_lics"])}', chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=generate_admin_return())
+    except Exception as e:
+        print('Error в answer_to_admin_stats:' + f'{e}')
+
+
+@dp.callback_query_handler(lambda call: call.data == 'admin_stats_back')
+async def answer_to_admin_back(call: CallbackQuery):
+    try:
+        await call.answer()
+        await bot.edit_message_text(text=f'Добро пожаловать в админку, <a href="tg://user?id={call.from_user.id}">{call.from_user.first_name}</a>', chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=generate_admin_main_page())
+    except Exception as e:
+        print('Error в answer_to_admin_back:' + f'{e}')
 
 @dp.callback_query_handler(lambda call: call.data == 'admin_deleteposition')
 async def answer_to_admin_deleteposition(call: CallbackQuery):
@@ -98,7 +107,7 @@ async def answer_to_admin_deleteposition(call: CallbackQuery):
         if len(db['price']) == 0: return await bot.send_message(call.message.chat.id, call.message.message_id, text='⚠ Извините, но я не нашел ни одну позицию в базе данных')
         await bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id, text=f'⬇ <b>Выберите позицию которую хотите удалить:</b>', reply_markup=generate_delete_positions())
     except Exception as e:
-        print(e)
+        print('Error в answer_to_admin_deleteposition:' + f'{e}')
 
 @dp.callback_query_handler(lambda call: call.data == 'admin_addposition')
 async def answer_to_admin_admin_addposition(call: CallbackQuery):
@@ -107,14 +116,14 @@ async def answer_to_admin_admin_addposition(call: CallbackQuery):
         await MySceneStates.addposition_period_scene.set()
         await bot.send_message(chat_id=call.message.chat.id, text='✍ Введите срок действия лицензии в днях:')
     except Exception as e:
-        print(e)
+        print('Error в answer_to_admin_admin_addposition:' + f'{e}')
 
 @dp.callback_query_handler(lambda call: call.data == 'admin_editposition')
 async def answer_to_admin_admin_editposition(call: CallbackQuery):
     try:
         await bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id, text='⬇ Выберите позицию которую хотите изменить:', reply_markup=generate_eidit_positions())
     except Exception as e:
-        print(e)
+        print('Error в answer_to_admin_admin_editposition:' + f'{e}')
 
 @dp.callback_query_handler(lambda call: 'positedite' in call.data)
 async def answer_to_admin_positedite(call: CallbackQuery):
@@ -130,7 +139,7 @@ async def answer_to_admin_positedite(call: CallbackQuery):
         collection.find_one_and_update({"_id": ObjectId('64987b1eeed9918b13b0e8b4')},
                                           {"$set": {"positindx": index_of_possition, "positeddays": 'None', "positedprice": 'None'}})
     except Exception as e:
-        print(e)
+        print('Error в answer_to_admin_positedite:' + f'{e}')
 
 @dp.callback_query_handler(lambda call: call.data == 'posited_days')
 async def answer_to_admin_posited_days(call: CallbackQuery):
@@ -139,7 +148,7 @@ async def answer_to_admin_posited_days(call: CallbackQuery):
         await MySceneStates.posited_days_scene.set()
         await bot.send_message(call.message.chat.id, text='✍ Введите срок действия лицензии в днях:')
     except Exception as e:
-        print(e)
+        print('Error в answer_to_admin_posited_days:' + f'{e}')
 
 @dp.callback_query_handler(lambda call: call.data == 'posited_price')
 async def answer_to_admin_posited_price(call: CallbackQuery):
@@ -148,7 +157,7 @@ async def answer_to_admin_posited_price(call: CallbackQuery):
         await MySceneStates.posited_price_scene.set()
         await bot.send_message(call.message.chat.id, text='✍ Введите сумму которую заплатит пользователь при покупке(Значение должно быть в десятичном-float формате. Пример: 100.0 | 250.0):')
     except Exception as e:
-        print(e)
+        print('Error в answer_to_admin_posited_price:' + f'{e}')
 
 @dp.callback_query_handler(lambda call: call.data == 'posited_cancel')
 async def answer_to_admin_posited_cancel(call: CallbackQuery):
@@ -164,7 +173,7 @@ async def answer_to_admin_posited_cancel(call: CallbackQuery):
                              text=f'💎 <b>Прайс-лист:</b>\n{prices}\nВыберите действие:',
                              reply_markup=generate_admin_price_edit_choice())
     except Exception as e:
-        print(e)
+        print('Error в answer_to_admin_posited_cancel:' + f'{e}')
 
 @dp.callback_query_handler(lambda call: call.data == 'posited_accept')
 async def answer_to_admin_posited_accept(call: CallbackQuery):
@@ -188,7 +197,7 @@ async def answer_to_admin_posited_accept(call: CallbackQuery):
                              text=f'💎 <b>Прайс-лист:</b>\n{prices}\nВыберите действие:',
                              reply_markup=generate_admin_price_edit_choice())
     except Exception as e:
-        print(e)
+        print('Error в answer_to_admin_posited_accept:' + f'{e}')
 
 
 @dp.callback_query_handler(lambda call: call.data == 'aedit_limittousers')
@@ -198,7 +207,7 @@ async def answer_to_admin_aedit_limittousers(call: CallbackQuery):
         await MySceneStates.aedit_limittousers_scene.set()
         await bot.send_message(call.message.chat.id, text='✍ Введите лимит пользователей на чаты, в которых отсутсвует лицензия:')
     except Exception as e:
-        print(e)
+        print('Error в answer_to_admin_aedit_limittousers:' + f'{e}')
 
 @dp.callback_query_handler(lambda call: 'positdelete' in call.data)
 async def react_to_admin_positdelete(call: CallbackQuery):
@@ -217,7 +226,7 @@ async def react_to_admin_positdelete(call: CallbackQuery):
         await call.answer('Успешное удаление позиции!')
         await bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id, reply_markup=generate_delete_positions())
     except Exception as e:
-        print(e)
+        print('Error в react_to_admin_positdelete:' + f'{e}')
 
 @dp.callback_query_handler(lambda call: call.data == 'back_to_edit_price')
 async def answer_to_admin_back_to_edit_price(call: CallbackQuery):
@@ -294,7 +303,7 @@ async def aedit_limittousers_scene(ctx: Message, state: FSMContext):
         db = collection.find_one({'_id': ObjectId('64987b1eeed9918b13b0e8b4')})
         await ctx.answer(text=f'✋ <b>Лимиты:</b>\n<b>Лимит количества пользователей на чат:</b> {db["limit_to_users"]}\n\nВыберите лимит который хотите изменить:', reply_markup=generate_admin_limit_edit_choice())
     except Exception as e:
-        print(e)
+        print('Error в aedit_limittousers_scene:' + f'{e}')
 
 @dp.message_handler(content_types=['text'], state=MySceneStates.posited_days_scene)
 async def posited_days_scene(ctx: Message, state: FSMContext):
@@ -324,7 +333,7 @@ async def posited_days_scene(ctx: Message, state: FSMContext):
         await ctx.answer(text=f'⬇ Выберите то, что бы вы хотели изменить в этой позиции:\n\n<b>{db["positeddays"]}</b> дней - <b>{db["positedprice"]}</b>₽',
                                reply_markup=generate_positedit())
     except Exception as e:
-        print(e)
+        print('Error в posited_days_scene:' + f'{e}')
 
 @dp.message_handler(content_types=['text'], state=MySceneStates.posited_price_scene)
 async def posited_price_scene(ctx: Message, state: FSMContext):
@@ -349,7 +358,7 @@ async def posited_price_scene(ctx: Message, state: FSMContext):
         await ctx.answer(text=f'⬇ Выберите то, что бы вы хотели изменить в этой позиции:\n\n<b>{db["positeddays"]}</b> дней - <b>{db["positedprice"]}</b>₽',
             reply_markup=generate_positedit())
     except Exception as e:
-        print(e)
+        print('Error в posited_price_scene:' + f'{e}')
 
 @dp.message_handler(content_types=['text'], state=MySceneStates.addposition_period_scene)
 async def addposition_period_scene(ctx: Message, state: FSMContext):
@@ -375,7 +384,7 @@ async def addposition_period_scene(ctx: Message, state: FSMContext):
         await MySceneStates.addposition_price_scene.set()
         await ctx.answer('✍ А теперь введите сумму которую заплатит пользователь при покупке(Значение должно быть в десятичном-float формате. Пример: 100.0 | 250.0):')
     except Exception as e:
-        print(e)
+        print('Error в addposition_period_scene:' + f'{e}')
 
 def has_decimal_point(string):
     parts = string.split('.')
@@ -405,7 +414,7 @@ async def addposition_price_scene(ctx: Message, state: FSMContext):
         await state.finish()
         await ctx.answer(f'Вы успешно добавили новую позицию:\n\n🆕 {db["price"][index_of_last_position]["period"]} дней - {text_to_float}₽', reply_markup=generate_admin_return_main())
     except Exception as e:
-        print(e)
+        print('Error в addposition_price_scene:' + f'{e}')
 
 @dp.message_handler(content_types=ContentTypes.ANY, state=MySceneStates.post_to_users)
 async def post_scene(ctx: Message, state: FSMContext):
@@ -417,7 +426,7 @@ async def post_scene(ctx: Message, state: FSMContext):
         await ctx.answer(text=f'Добро пожаловать в админку, <a href="tg://user?id={ctx.from_user.id}">{ctx.from_user.first_name}</a>',
                                reply_markup=generate_admin_main_page())
     except Exception as e:
-        print(e)
+        print('Error в post_scene:' + f'{e}')
 
 async def message_to_users(ctx, users: list, id):
     try:
@@ -430,7 +439,7 @@ async def message_to_users(ctx, users: list, id):
                 print('msg_t_users - user blocked the bot')
         await bot.edit_message_text('Отправка завершена ✅', ctx.chat.id, id)
     except Exception as e:
-        print(e)
+        print('Error в message_to_users:' + f'{e}')
 
 @dp.message_handler(commands=['user_to_id'])
 async def convert_to_id(ctx: Message):
@@ -453,6 +462,6 @@ async def convert_to_id(ctx: Message):
 
         if userid == None: return await ctx.answer('🔎 Пользователь не найден')
     except Exception as e:
-        print(e)
+        print('Error в convert_to_id:' + f'{e}')
 
 

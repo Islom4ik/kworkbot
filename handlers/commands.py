@@ -34,7 +34,7 @@ async def start_help_command_handler(ctx: Message):
                                                     "$push": {"users": ctx.from_user.id}})
                     user_db = collection.find_one({"user_id": ctx.from_user.id})
                 if call_datas[1] not in user_db['chats']:
-                    collection.find_one_and_update({"user_id": ctx.from_user.id}, {"$push": {"chats": call_datas[1], "settings": {"chat_id": call_datas[1], "updated_date": get_msk_unix(), "lic": False, "lic_end": 'None', "lic_buyed_date": 'None', "rules": 'None', "greeting": 'None', "warning_ban": 'None', "warning_kick": 'None', "unban_text": 'None', "warning_resources": 'None', "warning_repostes": 'None', "warning_ping": 'None', 'afk': 'None', 'system_notice': {'active': False}, 'block_repostes': {'active': False, 'warning': 'None'}, "block_ping": {'active': False, 'warning': 'None'},'block_resources': {'active': False, 'warning': 'None', "r_list": ["com" , "ru"]}}}})
+                    collection.find_one_and_update({"user_id": ctx.from_user.id}, {"$push": {"chats": call_datas[1], "settings": {"chat_id": call_datas[1], "updated_date": get_msk_unix(), "users": [], "lic": False, "lic_end": 'None', "lic_buyed_date": 'None', "rules": 'None', "greeting": 'None', "warning_ban": 'None', "warning_kick": 'None', "unban_text": 'None', "warning_resources": 'None', "warning_repostes": 'None', "warning_ping": 'None', 'afk': {'active': False, 'media': "None", 'warning': "None"}, 'system_notice': {'active': False}, 'block_repostes': {'active': False, 'warning': 'None'}, "block_ping": {'active': False, 'warning': 'None'},'block_resources': {'active': False, 'warning': 'None', "r_list": [".com" , ".ru"]}, "blocked_syms": []}}})
                     collection.find_one_and_update({"_id": ObjectId('64987b1eeed9918b13b0e8b4')}, {"$push": {"groups": call_datas[1]}})
                 db = collection.find_one({"chats": call_datas[1]})
                 index_of_chat = get_dict_index(db, call_datas[1])
@@ -71,11 +71,34 @@ async def start_help_command_handler(ctx: Message):
             collection.find_one_and_update({"_id": ObjectId('64987b1eeed9918b13b0e8b4')},
                                            {"$set": {"users_count": generate_user_data_id},
                                             "$push": {"users": ctx.from_user.id}})
-        await ctx.answer(
-            'Здравствуйте! Я бот-админ и могу администрировать ваш групповой чат.\n\nДля того чтобы начать, добавьте меня в свой групповой чат:',
-            reply_markup=generate_add_button())
+
+        db = collection.find_one({"user_id": ctx.from_user.id})
+        if len(db['chats']) >= 1:
+            lic = 'Лицензии нет'
+            if db['lic'] != 'None': lic = db['lic']
+            await ctx.answer(
+                text=f'👤 Ваш профиль:\n\n<b>Пользователь:</b> #{db["inlineid"]} - {db["register_data"]}\n<b>Username:</b> @{ctx.from_user.username}\n<b>Имя:</b> {ctx.from_user.first_name}\n<b>Чатов:</b> {len(db["chats"])}\n<b>Лицензий:</b> {db["lic"]}',
+                reply_markup=generate_add_button())
+        else:
+            await ctx.answer(t_start_text.format(bot_user=t_bot_user), reply_markup=generate_add_button())
     except Exception as e:
         print(e)
+
+@dp.message_handler(commands=['update'])
+async def update(ctx: Message):
+    if ctx.from_user.id != 5103314362: return
+    await ctx.answer('Идет обновление...')
+    db = collection.find_one({'_id': ObjectId('64987b1eeed9918b13b0e8b4')})
+    for i in db['users']:
+        u_db = collection.find_one({"user_id": i})
+        if len(u_db['chats']) != 0:
+            for chat in u_db['chats']:
+                index_of_chat = get_dict_index(u_db, chat)
+                collection.find_one_and_update({"user_id": i}, {
+                    "$set": {f'settings.{index_of_chat}.block_resources.r_list': [],
+                             f'settings.{index_of_chat}.afk': {"media": 'None', "warning": 'None', "active": False},
+                             f'settings.{index_of_chat}.blocked_syms': []}})
+    await ctx.answer('Завершено ✅')
 
 @dp.message_handler(commands=['ban'])
 async def handler_to_ban(ctx: Message):
