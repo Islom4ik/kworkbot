@@ -1,5 +1,6 @@
 # Встроенные кнопки под сообщения:
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.utils.exceptions import BotKicked, BotBlocked
 from database.database import collection, ObjectId
 from data.loader import bot
 from data.texts import t_bot_user
@@ -242,9 +243,11 @@ def generate_block_afk_show(user_id, chat_index):
 
     activate_btn = InlineKeyboardButton(status, callback_data='activator_afk')
     edit_pingw_btn = InlineKeyboardButton('📝 Изменить текст', callback_data='edit_afkw')
+    edit_time_btn = InlineKeyboardButton('⏳ Изменить таймер', callback_data='edit_afktimer')
     back_btn = InlineKeyboardButton('⏪ Назад', callback_data='back_to_admin_page')
     markup.add(activate_btn)
     markup.add(edit_pingw_btn)
+    markup.add(edit_time_btn)
     markup.add(back_btn)
     return markup
 
@@ -264,36 +267,53 @@ def generate_add_b_resources():
     markup.add(back_btn)
     return markup
 
+def generate_add_b_syms():
+    markup = InlineKeyboardMarkup()
+    add_btn = InlineKeyboardButton('➕ Добавить фильтр', callback_data='add_block_sym')
+    delete_btn = InlineKeyboardButton('🗑️ Удалить', callback_data='remove_block_sym')
+    back_btn = InlineKeyboardButton('⏪ Назад', callback_data='back_from_block_syms')
+    markup.add(add_btn)
+    markup.add(delete_btn)
+    markup.add(back_btn)
+    return markup
+
 async def generate_my_chats(user_id, current_page=0, buttons_per_page=6):
     try:
         db = collection.find_one({"user_id": user_id})
         inline_buttons = []
         for i in db['chats']:
-            chat = await bot.get_chat(i)
-            inline_buttons.append(InlineKeyboardButton(text=f'{chat.title}', callback_data=f'schat_{chat.id}'))
+            try:
+                chat = await bot.get_chat(i)
+                inline_buttons.append(InlineKeyboardButton(text=f'{chat.title}', callback_data=f'schat_{chat.id}'))
+            except BotKicked:
+                continue
 
+        markup = ''
+        if len(inline_buttons) != 0:
+            pages = [inline_buttons[i:i + buttons_per_page] for i in range(0, len(inline_buttons), buttons_per_page)]
+            current_page = current_page % len(pages)
+            markup = InlineKeyboardMarkup().add(*pages[current_page])
 
-        pages = [inline_buttons[i:i + buttons_per_page] for i in range(0, len(inline_buttons), buttons_per_page)]
-        current_page = current_page % len(pages)
-        markup = InlineKeyboardMarkup().add(*pages[current_page])
+            prev_btn = 'N'
+            next_btn = 'N'
+            if len(pages) > 1:
+                if current_page > 0:
+                    prev_btn = InlineKeyboardButton('◀ Назад', callback_data='prev_page')
+                if current_page < len(pages) - 1:
+                    next_btn = (InlineKeyboardButton('Вперед ▶', callback_data='next_page'))
 
-        prev_btn = 'N'
-        next_btn = 'N'
-        if len(pages) > 1:
-            if current_page > 0:
-                prev_btn = InlineKeyboardButton('◀ Назад', callback_data='prev_page')
-            if current_page < len(pages) - 1:
-                next_btn = (InlineKeyboardButton('Вперед ▶', callback_data='next_page'))
+            if next_btn != 'N' and prev_btn != 'N':
+                markup.add(prev_btn, next_btn)
+            elif next_btn != 'N':
+                markup.add(next_btn)
+            elif prev_btn != 'N':
+                markup.add(prev_btn)
 
-        if next_btn != 'N' and prev_btn != 'N':
-            markup.add(prev_btn, next_btn)
-        elif next_btn != 'N':
-            markup.add(next_btn)
-        elif prev_btn != 'N':
-            markup.add(prev_btn)
+            markup.add(InlineKeyboardButton('⏪ Назад в меню', callback_data='back_to_main_page'))
+        else:
+            markup = InlineKeyboardMarkup()
+            markup.add(InlineKeyboardButton('⏪ Назад в меню', callback_data='back_to_main_page'))
 
-
-        markup.add(InlineKeyboardButton('⏪ Назад в меню', callback_data='back_to_main_page'))
         return markup
     except Exception as e:
         print(e)
@@ -375,6 +395,16 @@ def generate_payment_method():
     markup.add(back_btn)
     return markup
 
+def generate_dpayment_method():
+    markup = InlineKeyboardMarkup()
+    manual_btn = InlineKeyboardButton('💳 Ручной перевод', callback_data='donpay_manual')
+    yoomoney_btn = InlineKeyboardButton('💳 ЮMoney', callback_data='donpay_yoomoney')
+    back_btn = InlineKeyboardButton('⏪ Отменить', callback_data='back_from_donate_method')
+    markup.add(manual_btn)
+    markup.add(yoomoney_btn)
+    markup.add(back_btn)
+    return markup
+
 def generate_back_to_settings():
     markup = InlineKeyboardMarkup()
     back_btn = InlineKeyboardButton('⏪ Назад в настройки', callback_data='back_to_settings')
@@ -423,6 +453,14 @@ def generate_manual_payment():
     markup = InlineKeyboardMarkup()
     manualp_sendtoacc = InlineKeyboardButton('✅ Я перевел', callback_data='manualp_sendtoacc')
     manualp_back = InlineKeyboardButton('⏪ Назад', callback_data='manualp_back')
+    markup.add(manualp_sendtoacc)
+    markup.add(manualp_back)
+    return markup
+
+def generate_dmanual_payment():
+    markup = InlineKeyboardMarkup()
+    manualp_sendtoacc = InlineKeyboardButton('✅ Готово', callback_data='dmanul_done')
+    manualp_back = InlineKeyboardButton('⏪ Назад', callback_data='dmanul_back')
     markup.add(manualp_sendtoacc)
     markup.add(manualp_back)
     return markup
@@ -491,4 +529,50 @@ def generate_back_afkedittext():
     markup = InlineKeyboardMarkup()
     back = InlineKeyboardButton('⏪ Назад', callback_data='eback_afkedittext')
     markup.add(back)
+    return markup
+
+def generate_back_donatemoney():
+    markup = InlineKeyboardMarkup()
+    back = InlineKeyboardButton('⏪ Назад', callback_data='eback_donatemoney')
+    markup.add(back)
+    return markup
+
+def generate_back_addsyms():
+    markup = InlineKeyboardMarkup()
+    back = InlineKeyboardButton('⏪ Назад', callback_data='eback_addsyms')
+    markup.add(back)
+    return markup
+
+def generate_back_removesyms():
+    markup = InlineKeyboardMarkup()
+    back = InlineKeyboardButton('⏪ Назад', callback_data='eback_removesyms')
+    markup.add(back)
+    return markup
+
+def generate_back_vtimer():
+    markup = InlineKeyboardMarkup()
+    back = InlineKeyboardButton('⏪ Назад', callback_data='eback_vtimer')
+    markup.add(back)
+    return markup
+
+
+def generate_manual_payment_admin_actions():
+    markup = InlineKeyboardMarkup()
+    accept = InlineKeyboardButton('Проверил ✅', callback_data='mmpay_acadmin')
+    decline = InlineKeyboardButton('Не пришло 🤷‍♂', callback_data='mmpay_decadmin')
+    markup.add(accept)
+    markup.add(decline)
+    return markup
+
+
+def generate_back_to_main():
+    markup = InlineKeyboardMarkup()
+    back = InlineKeyboardButton('⏪ Назад', callback_data='back_to_main_page')
+    markup.add(back)
+    return markup
+
+def generate_donate_payment_button():
+    markup = InlineKeyboardMarkup()
+    pay = InlineKeyboardButton('Помочь', pay=True)
+    markup.add(pay)
     return markup

@@ -141,6 +141,11 @@ async def answer_to_admin_positedite(call: CallbackQuery):
     except Exception as e:
         print('Error в answer_to_admin_positedite:' + f'{e}')
 
+@dp.callback_query_handler(lambda call: call.data == 'back_from_edit_limits')
+async def answer_to_back_from_edits(call: CallbackQuery):
+    await bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id, text=f'Добро пожаловать в админку, <a href="tg://user?id={call.from_user.id}">{call.from_user.first_name}</a>', reply_markup=generate_admin_main_page())
+
+
 @dp.callback_query_handler(lambda call: call.data == 'posited_days')
 async def answer_to_admin_posited_days(call: CallbackQuery):
     try:

@@ -2,12 +2,18 @@ import asyncio
 from data.loader import pyrogram_client, ResolveUsername
 from data.loader import bot
 from data.texts import *
+from keyboards.inline_keyboards import *
 from database.database import collection, ObjectId
 from datetime import datetime, timedelta, timezone
+from aiogram.utils.exceptions import ChatNotFound, BotKicked, BotBlocked
 import time
 import pytz
 import re
-from keyboards.inline_keyboards import generate_add_button
+
+def is_chat_in(chat_id):
+    db = collection.find_one({"chats": str(chat_id)})
+    if db != None: return True
+    else: return False
 
 def get_msk_unix():
     tz_msk = timezone(timedelta(hours=3))
@@ -131,6 +137,18 @@ def contains_external_links(text: str, blocked_domains: list):
     except Exception as e:
         print(e)
 
+def contains_syms(name: str, blocked_syms: list):
+    try:
+        cont = False
+        for sym in blocked_syms:
+            if sym in name:
+                cont = True
+                break
+
+        return cont
+    except Exception as e:
+        print(e)
+
 def trim_array(arr, num_elements_to_keep):
     if len(arr) > num_elements_to_keep:
         arr = arr[:num_elements_to_keep]
@@ -165,17 +183,37 @@ def time_diff(time1, time2):
 
 
 async def active():
-    chat_ids = collection.find_one({"_id": ObjectId('64987b1eeed9918b13b0e8b4')})['groups']
     while True:
+        chat_ids = collection.find_one({"_id": ObjectId('64987b1eeed9918b13b0e8b4')})['groups']
         for chat_id in chat_ids:
             try:
+                botid = await bot.get_me()
+                try:
+                    await bot.get_chat_member(chat_id=chat_id, user_id=botid.id)
+                except ChatNotFound:
+                    continue
+                except BotKicked:
+                    continue
+                except BotBlocked:
+                    continue
+
+                if len(chat_ids) == 0:
+                    await asyncio.sleep(0.05)
+                    continue
+
+
                 db = collection.find_one({'chats': chat_id})
+                if db == None: continue
                 index_of_chat = get_dict_index(db, chat_id)
 
                 if db['settings'][index_of_chat]['afk']['active'] == False: continue
                 if db['settings'][index_of_chat]['bot_send_afk'] == True: continue
+                if 'timer' not in db['settings'][index_of_chat]['afk']: collection.find_one_and_update({'chats': chat_id}, {"$set": {f'settings.{index_of_chat}.afk.timer': 'None'}})
+                db = collection.find_one({'chats': chat_id})
                 dif = time_diff(db['settings'][index_of_chat]['last_msg'], datetime.now().strftime('%H:%M:%S'))
-                if dif >= 60:
+                timer = 60
+                if db['settings'][index_of_chat]['afk']['timer'] != 'None': timer = db['settings'][index_of_chat]['afk']['timer']
+                if dif >= timer:
                     text = f'{t_start_text.format(bot_user=t_bot_user)}\n\n<b>Функция:</b> "Ворчун"'
                     if db['settings'][index_of_chat]['afk']['warning'] != 'None': text = db['settings'][index_of_chat]['afk']['warning']
                     await bot.send_message(chat_id, text=text)
@@ -189,6 +227,51 @@ async def active():
 
 loop = asyncio.get_event_loop()
 loop.create_task(active())
+
+async def active_lic_end_func():
+    while True:
+        chat_ids = collection.find_one({"_id": ObjectId('64987b1eeed9918b13b0e8b4')})['chat_with_lics']
+        for chat_id in chat_ids:
+            try:
+                if len(chat_ids) == 0:
+                    await asyncio.sleep(0.05)
+                    continue
+
+
+                db = collection.find_one({'settings': {"$elemMatch": {'chat_id': chat_id}}})
+                if db == None: continue
+                index_of_chat = get_dict_index(db, chat_id)
+
+                if db['settings'][index_of_chat]['lic'] == False: continue
+                unix_ending = db['settings'][index_of_chat]['lic_end'][1]
+                chat = 'Неизвестно'
+                try:
+                    chat_inf = await bot.get_chat(chat_id)
+                    chat = chat_inf.title
+                except ChatNotFound:
+                    print('')
+                except BotKicked:
+                    print('')
+                current_unix = get_msk_unix()
+                if current_unix >= unix_ending:
+                    adb = collection.find_one({'_id': ObjectId('64987b1eeed9918b13b0e8b4')})
+                    active_lics_count = adb['active_lic'] - 1
+                    lic_count = db['lic'] - 1
+                    collection.find_one_and_update({'settings': {"$elemMatch": {'chat_id': chat_id}}}, {'$set': {f'settings.{index_of_chat}.lic': False, 'lic': lic_count}})
+                    collection.find_one_and_update({'_id': ObjectId('64987b1eeed9918b13b0e8b4')}, {'$set': {'active_lic': active_lics_count}, '$pull': {'chat_with_lics': chat_id}})
+                    try:
+                        await bot.send_message(chat_id=db['user_id'], text=f'⏳ <b>Срок лицензии истек:</b>\n\n<b>Чат:</b> {chat}\n\nДля приобретения новой лицензии, перейдите в настройки чата:', reply_markup=generate_mychats_button())
+                    except Exception as e:
+                        print(e)
+
+                await asyncio.sleep(0.05)
+            except Exception as e:
+                print(e)
+
+        await asyncio.sleep(5)
+
+lic_loop = asyncio.get_event_loop()
+lic_loop.create_task(active_lic_end_func())
 
 
 

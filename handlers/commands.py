@@ -5,6 +5,7 @@ import time
 import pytz
 from data.loader import bot, dp, FSMContext, State, Message
 from database.database import collection, ObjectId
+from aiogram.utils.exceptions import BotKicked, BotBlocked, ChatNotFound
 from states_scenes.scene import MySceneStates
 from keyboards.inline_keyboards import *
 from time import sleep
@@ -15,33 +16,6 @@ from data.texts import *
 @dp.message_handler(commands=['start'])
 async def start_help_command_handler(ctx: Message):
     try:
-        if '/start settings_' in ctx.text:
-            call_data = ctx.text.replace('/start ', '')
-            call_datas = call_data.split('_')
-            if ctx.from_user.id != int(call_datas[2]):
-                await ctx.answer('⚠ Извините у вас не достаточно прав чтобы изменять настройки для данного чата')
-                await asyncio.sleep(2)
-            else:
-                user_db = collection.find_one({"user_id": ctx.from_user.id})
-                if user_db == None:
-                    admindb = collection.find_one({"_id": ObjectId('64987b1eeed9918b13b0e8b4')})
-                    generate_user_data_id = admindb['users_count'] + 1
-                    collection.insert_one(
-                        {"user_id": ctx.from_user.id, "register_data": datetime.now().strftime("%d.%m.%Y"),
-                         "inlineid": generate_user_data_id, "manual_msg": False, "manual_msg": False, "manual_s": False, "chats": [], "settings": [], "lic": 0})
-                    collection.find_one_and_update({"_id": ObjectId('64987b1eeed9918b13b0e8b4')},
-                                                   {"$set": {"users_count": generate_user_data_id},
-                                                    "$push": {"users": ctx.from_user.id}})
-                    user_db = collection.find_one({"user_id": ctx.from_user.id})
-                if call_datas[1] not in user_db['chats']:
-                    collection.find_one_and_update({"user_id": ctx.from_user.id}, {"$push": {"chats": call_datas[1], "settings": {"chat_id": call_datas[1], "updated_date": get_msk_unix(), "users": [], "lic": False, "lic_end": 'None', "lic_buyed_date": 'None', "rules": 'None', "greeting": 'None', "warning_ban": 'None', "warning_kick": 'None', "unban_text": 'None', "warning_resources": 'None', "warning_repostes": 'None', "warning_ping": 'None', 'afk': {'active': False, 'media': "None", 'warning': "None"}, 'system_notice': {'active': False}, 'block_repostes': {'active': False, 'warning': 'None'}, "block_ping": {'active': False, 'warning': 'None'},'block_resources': {'active': False, 'warning': 'None', "r_list": [".com" , ".ru"]}, "blocked_syms": []}}})
-                    collection.find_one_and_update({"_id": ObjectId('64987b1eeed9918b13b0e8b4')}, {"$push": {"groups": call_datas[1]}})
-                db = collection.find_one({"chats": call_datas[1]})
-                index_of_chat = get_dict_index(db, call_datas[1])
-                if db['settings'][index_of_chat]['lic'] == True: return await ctx.answer(settings_start.format(group_id=call_datas[1], bot_user=bot_user, upd_time=update_time(db['settings'][index_of_chat]['updated_date'])), reply_markup=generate_settings(True))
-                return await ctx.answer(t_settings.format(group_id=call_datas[1], bot_user=t_bot_user, upd_time=update_time(db['settings'][index_of_chat]['updated_date'])), reply_markup=generate_settings())
-
-
         if ctx.chat.type == 'group' or ctx.chat.type == 'supergroup':
             if ctx['from']['username'] == 'GroupAnonymousBot': return await ctx.answer('🤷‍♂ Извините, Аноним мы уважаем ваше решение но мы не можем идентифицировать создателя группы пока тот является анонимом...\n\nПопросим вас выключить анонимность на пару минут и следовать инструкция бота, но а позже вы сможете обратно включить анонимность и управлять ботом в личных сообщениях!')
             admins = await bot.get_chat_administrators(ctx.chat.id)
@@ -62,6 +36,56 @@ async def start_help_command_handler(ctx: Message):
                         '🤖 Здравствуйте! Я бот-админ и могу администрировать данный чат.\n\nВыдайте мне все права администратора:\n- Управлять группой\n- Удаление сообщений\n- Изменение сообщений\n- Блокировать участников\n- Добовлять участников\n- Управлять пользователями\n- Добавление администраторов',
                         reply_markup=generate_check_admin_rights())
                     break
+
+        if '/start settings_' in ctx.text:
+            call_data = ctx.text.replace('/start ', '')
+            call_datas = call_data.split('_')
+            try:
+                chat_admins = await bot.get_chat_administrators(call_datas[1])
+                chat_owner = next((obj for obj in chat_admins if obj["status"] == "creator"), None).user.id
+
+                if ctx.from_user.id != chat_owner:
+                    await ctx.answer('⚠ Извините у вас недостаточно прав чтобы изменять настройки для данного чата')
+                    await asyncio.sleep(1)
+                else:
+                    user_db = collection.find_one({"user_id": ctx.from_user.id})
+                    if user_db == None:
+                        admindb = collection.find_one({"_id": ObjectId('64987b1eeed9918b13b0e8b4')})
+                        generate_user_data_id = admindb['users_count'] + 1
+                        collection.insert_one(
+                            {"user_id": ctx.from_user.id, "register_data": datetime.now().strftime("%d.%m.%Y"),
+                             "inlineid": generate_user_data_id, "manual_msg": False, "manual_msg": False, "manual_s": False, "chats": [], "settings": [], "lic": 0})
+                        collection.find_one_and_update({"_id": ObjectId('64987b1eeed9918b13b0e8b4')},
+                                                       {"$set": {"users_count": generate_user_data_id},
+                                                        "$push": {"users": ctx.from_user.id}})
+                        user_db = collection.find_one({"user_id": ctx.from_user.id})
+                    if call_datas[1] not in user_db['chats']:
+                        insettings = False
+                        for chat in user_db['settings']:
+                            if chat['chat_id'] == call_datas[1]:
+                                insettings = True
+                                break
+                        if insettings == True:
+                            collection.find_one_and_update({"_id": ObjectId('64987b1eeed9918b13b0e8b4')},
+                                                           {"$push": {"groups": call_datas[1]}})
+                            collection.find_one_and_update({"user_id": ctx.from_user.id}, {
+                                "$push": {"chats": call_datas[1]}})
+                        else:
+                            collection.find_one_and_update({"user_id": ctx.from_user.id}, {"$push": {"chats": call_datas[1], "settings": {"chat_id": call_datas[1], "updated_date": get_msk_unix(), "users": [], "lic": False, "lic_end": 'None', "lic_buyed_date": 'None', "rules": 'None', "greeting": 'None', "warning_ban": 'None', "warning_kick": 'None', "unban_text": 'None', "warning_resources": 'None', "warning_repostes": 'None', "warning_ping": 'None', 'afk': {'active': False, 'media': "None", 'warning': "None"}, 'system_notice': {'active': False}, 'block_repostes': {'active': False, 'warning': 'None'}, "block_ping": {'active': False, 'warning': 'None'}, 'block_resources': {'active': False, 'warning': 'None', "r_list": [".com", ".ru"]}, "blocked_syms": []}}})
+                            collection.find_one_and_update({"_id": ObjectId('64987b1eeed9918b13b0e8b4')}, {"$push": {"groups": call_datas[1]}})
+                    db = collection.find_one({"chats": call_datas[1]})
+                    index_of_chat = get_dict_index(db, call_datas[1])
+                    if db['settings'][index_of_chat]['lic'] == True: return await ctx.answer(t_settings.format(group_id=call_datas[1], bot_user=t_bot_user, upd_time=update_time(db['settings'][index_of_chat]['updated_date'])), reply_markup=generate_settings(True))
+                    return await ctx.answer(t_settings.format(group_id=call_datas[1], bot_user=t_bot_user, upd_time=update_time(db['settings'][index_of_chat]['updated_date'])), reply_markup=generate_settings())
+            except BotKicked:
+                await ctx.answer('⚠ Извините, у меня нет доступа в настройки данного чата.')
+            except BotBlocked:
+                await ctx.answer(
+                    '⚠ Извините, у меня нет доступа в настройки данного чата.')
+            except ChatNotFound:
+                await ctx.answer(
+                    '⚠ Извините, у меня нет доступа в настройки данного чата.')
+
 
         db = collection.find_one({"user_id": ctx.from_user.id})
         if db == None:
@@ -97,7 +121,7 @@ async def update(ctx: Message):
                 collection.find_one_and_update({"user_id": i}, {
                     "$set": {f'settings.{index_of_chat}.block_resources.r_list': [],
                              f'settings.{index_of_chat}.afk': {"media": 'None', "warning": 'None', "active": False},
-                             f'settings.{index_of_chat}.blocked_syms': []}})
+                             f'settings.{index_of_chat}.blocked_syms': [], f'settings.{index_of_chat}.users': []}})
     await ctx.answer('Завершено ✅')
 
 @dp.message_handler(commands=['ban'])
@@ -119,10 +143,10 @@ async def handler_to_ban(ctx: Message):
                     if ctx.reply_to_message:
                         await bot.ban_chat_member(ctx.reply_to_message.chat.id, ctx.reply_to_message.from_user.id)
                         banned = collection.find_one({"user_id": creator_id})
-                        text = f'👨🏻‍⚖ Администратор <b>{ctx.from_user.first_name}</b> забанил <a href="tg://user?id={ctx.reply_to_message.from_user.id}">{ctx.reply_to_message.from_user.first_name}</a> за систематические нарушения правил!'
+                        text = t_ban.format(member_name=f'<b><a href="tg://user?id={ctx.reply_to_message.from_user.id}">{ctx.reply_to_message.from_user.first_name}</a></b>', admin=f'<b>{ctx.from_user.first_name}</b>')
                         index = get_dict_index(banned, ctx.chat.id)
                         if banned['settings'][index]['warning_ban'] != 'None':
-                            text = banned['settings'][index]['warning_ban'].replace('{member_name}', f'<a href="tg://user?id={ctx.reply_to_message.from_user.id}">{ctx.reply_to_message.from_user.first_name}</a>').replace('{admin}', f'<b>{ctx.from_user.first_name}</b>')
+                            text = banned['settings'][index]['warning_ban'].replace('{member_name}', f'<b><a href="tg://user?id={ctx.reply_to_message.from_user.id}">{ctx.reply_to_message.from_user.first_name}</a></b>').replace('{admin}', f'<b>{ctx.from_user.first_name}</b>')
 
                         await ctx.answer(text)
                         break
@@ -140,7 +164,7 @@ async def handler_to_ban(ctx: Message):
                     for item in ctx.entities:
                         if 'user' in item:
                             dicts_with_user_key.append(item.user.id)
-                            collection.find_one_and_update({"user_id": creator_id}, {"$push": {"baned": f'<a href="tg://user?id={item.user.id}">{item.user.first_name}</a>'}})
+                            collection.find_one_and_update({"user_id": creator_id}, {"$push": {"baned": f'<b><a href="tg://user?id={item.user.id}">{item.user.first_name}</a></b>'}})
 
                     pattern = r"https://t.me/([\w_]+)"
                     for i in args:
@@ -148,13 +172,13 @@ async def handler_to_ban(ctx: Message):
                             userid = await resolve_username_to_user_id(i.replace('@', ''))
                             dicts_with_user_key.append(userid[0])
                             collection.find_one_and_update({"user_id": creator_id}, {
-                                "$push": {"baned": f'<a href="tg://user?id={userid[0]}">{userid[1]}</a>'}})
+                                "$push": {"baned": f'<b><a href="tg://user?id={userid[0]}">{userid[1]}</a></b>'}})
                         elif re.search(pattern, i):
                             user = re.findall(pattern, i)[0]
                             userid = await resolve_username_to_user_id(user)
                             dicts_with_user_key.append(userid[0])
                             collection.find_one_and_update({"user_id": creator_id}, {
-                                "$push": {"baned": f'<a href="tg://user?id={userid[0]}">{userid[1]}</a>'}})
+                                "$push": {"baned": f'<b><a href="tg://user?id={userid[0]}">{userid[1]}</a></b>'}})
 
 
                     if len(dicts_with_user_key) == 0:
@@ -166,7 +190,7 @@ async def handler_to_ban(ctx: Message):
                         await bot.ban_chat_member(ctx.chat.id, i)
 
                     banned = collection.find_one({"user_id": creator_id})
-                    text = f'👨🏻‍⚖ Администратор <b>{ctx.from_user.first_name}</b> забанил {", ".join(banned["baned"])} за систематические нарушения правил!'
+                    text = t_ban.format(member_name=", ".join(banned["baned"]), admin=f'<b>{ctx.from_user.first_name}</b>')
                     index = get_dict_index(banned, ctx.chat.id)
                     if banned['settings'][index]['warning_ban'] != 'None':
                         text = banned['settings'][index]['warning_ban'].replace('{member_name}', ", ".join(banned["baned"])).replace('{admin}', f'<b>{ctx.from_user.first_name}</b>')
@@ -178,6 +202,8 @@ async def handler_to_ban(ctx: Message):
                 asyncio.create_task(delete_message(5, [trash.message_id], ctx.chat.id))
 
             asyncio.create_task(delete_message(5, [ctx.message_id], ctx.chat.id))
+        else:
+            await ctx.delete()
 
     except Exception as e:
         trash = ''
@@ -208,7 +234,7 @@ async def handler_to_unban(ctx: Message):
                 if user.user.id == ctx.from_user.id and (user.status == 'creator' or user.status == 'administrator') and user.can_restrict_members == True:
                     isadmin = True
                     args = ctx.text.split(' ')
-                    if args[1] == '@shieldsword_bot':
+                    if args[1] == f'@{t_bot_user}':
                         trash = await ctx.reply('Кхм-Кхм...')
                         return asyncio.create_task(delete_message(6, [trash.message_id, ctx.message_id], trash.chat.id))
 
@@ -232,10 +258,10 @@ async def handler_to_unban(ctx: Message):
                                 if userc.status == 'kicked':
                                     dicts_with_user_key.append(userid[0])
                                     collection.find_one_and_update({"user_id": creator_id}, {
-                                        "$push": {"unbaned": f'<a href="tg://user?id={userid[0]}">{userid[1]}</a>'}})
+                                        "$push": {"unbaned": f'<b><a href="tg://user?id={userid[0]}">{userid[1]}</a></b>'}})
                                 else:
                                     trash = await ctx.answer(
-                                        f'⚠ Участник <a href="tg://user?id={userid[0]}">{userid[1]}</a> не заблокирован')
+                                        f'⚠ Участник <b><a href="tg://user?id={userid[0]}">{userid[1]}</a></b> не заблокирован')
                                     asyncio.create_task(
                                         delete_message(10, [trash.message_id, ctx.message_id], ctx.chat.id))
                             except:
@@ -248,10 +274,10 @@ async def handler_to_unban(ctx: Message):
                                 if userc.status == 'kicked':
                                     dicts_with_user_key.append(userid[0])
                                     collection.find_one_and_update({"user_id": creator_id}, {
-                                        "$push": {"unbaned": f'<a href="tg://user?id={userid[0]}">{userid[1]}</a>'}})
+                                        "$push": {"unbaned": f'<b><a href="tg://user?id={userid[0]}">{userid[1]}</a></b>'}})
                                 else:
                                     trash = await ctx.answer(
-                                        f'⚠ Участник <a href="tg://user?id={userid[0]}">{userid[1]}</a> не заблокирован')
+                                        f'⚠ Участник <b><a href="tg://user?id={userid[0]}">{userid[1]}</a></b> не заблокирован')
                                     asyncio.create_task(
                                         delete_message(10, [trash.message_id, ctx.message_id], ctx.chat.id))
                             except:
@@ -265,7 +291,7 @@ async def handler_to_unban(ctx: Message):
                         unban = await bot.unban_chat_member(ctx.chat.id, i, only_if_banned=False)
 
                     unbaned = collection.find_one({"user_id": creator_id})
-                    text = f'👨🏻‍⚖ Администратор <b>{ctx.from_user.first_name}</b> разбанил {", ".join(unbaned["unbaned"])}'
+                    text = t_unban.format(member_name=", ".join(unbaned["unbaned"]), admin=f'<b>{ctx.from_user.first_name}</b>')
                     index = get_dict_index(unbaned, ctx.chat.id)
                     if unbaned['settings'][index]['unban_text'] != 'None':
                         text = unbaned['settings'][index]['unban_text'].replace('{member_name}', ", ".join(unbaned["unbaned"])).replace('{admin}', f'<b>{ctx.from_user.first_name}</b>')
@@ -279,6 +305,8 @@ async def handler_to_unban(ctx: Message):
                 asyncio.create_task(delete_message(5, [trash.message_id], ctx.chat.id))
 
             asyncio.create_task(delete_message(5, [ctx.message_id], ctx.chat.id))
+        else:
+            await ctx.delete()
     except Exception as e:
         trash = ''
         if e.args[
@@ -303,11 +331,14 @@ async def handler_to_kick(ctx: Message):
                         user.status == 'creator' or user.status == 'administrator') and user.can_restrict_members == True:
                     isadmin = True
 
+                    db = collection.find_one({'chats': str(ctx.chat.id)})
+                    index_of_chat = get_dict_index(db, str(ctx.chat.id))
                     if ctx.reply_to_message:
                         await bot.kick_chat_member(ctx.reply_to_message.chat.id, ctx.reply_to_message.from_user.id)
                         await bot.unban_chat_member(ctx.reply_to_message.chat.id, ctx.reply_to_message.from_user.id)
-                        await ctx.answer(
-                            f'👨🏻‍⚖ Администратор <b>{ctx.from_user.first_name}</b> кикнул <a href="tg://user?id={ctx.reply_to_message.from_user.id}">{ctx.reply_to_message.from_user.first_name}</a> за систематические нарушения правил!')
+                        text = t_kick.format(member_name=f'<b><a href="tg://user?id={ctx.reply_to_message.from_user.id}">{ctx.reply_to_message.from_user.first_name}</a></b>', admin=f'<b>{ctx.from_user.first_name}</b>')
+                        if db['settings'][index_of_chat]['warning_kick'] != 'None': text = db['settings'][index_of_chat]['warning_kick'].replace('{member_name}', f'<b><a href="tg://user?id={ctx.reply_to_message.from_user.id}">{ctx.reply_to_message.from_user.first_name}</a></b>').replace('{admin}', f'<b>{ctx.from_user.first_name}</b>')
+                        await ctx.answer(text)
 
                         break
 
@@ -328,7 +359,7 @@ async def handler_to_kick(ctx: Message):
                         if 'user' in item:
                             dicts_with_user_key.append(item.user.id)
                             collection.find_one_and_update({"user_id": creator_id}, {"$push": {
-                                "kicked": f'<a href="tg://user?id={item.user.id}">{item.user.first_name}</a>'}})
+                                "kicked": f'<b><a href="tg://user?id={item.user.id}">{item.user.first_name}</a></b>'}})
 
                     pattern = r"https://t.me/([\w_]+)"
                     for i in args:
@@ -336,13 +367,13 @@ async def handler_to_kick(ctx: Message):
                             userid = await resolve_username_to_user_id(i.replace('@', ''))
                             dicts_with_user_key.append(userid[0])
                             collection.find_one_and_update({"user_id": creator_id}, {
-                                "$push": {"kicked": f'<a href="tg://user?id={userid[0]}">{userid[1]}</a>'}})
+                                "$push": {"kicked": f'<b><a href="tg://user?id={userid[0]}">{userid[1]}</a></b>'}})
                         elif re.search(pattern, i):
                             user = re.findall(pattern, i)[0]
                             userid = await resolve_username_to_user_id(user)
                             dicts_with_user_key.append(userid[0])
                             collection.find_one_and_update({"user_id": creator_id}, {
-                                "$push": {"kicked": f'<a href="tg://user?id={userid[0]}">{userid[1]}</a>'}})
+                                "$push": {"kicked": f'<b><a href="tg://user?id={userid[0]}">{userid[1]}</a></b>'}})
 
                     if len(dicts_with_user_key) == 0:
                         trash = await ctx.answer('🪪 Пользователь не найден')
@@ -353,7 +384,7 @@ async def handler_to_kick(ctx: Message):
                         await bot.unban_chat_member(ctx.chat.id, i)
 
                     kicked = collection.find_one({"user_id": creator_id})
-                    text = f'👨🏻‍⚖ Администратор <b>{ctx.from_user.first_name}</b> кикнул {", ".join(kicked["kicked"])} за систематические нарушения правил!'
+                    text = t_kick.format(member_name=", ".join(kicked["kicked"]), admin=f'<b>{ctx.from_user.first_name}</b>')
                     index = get_dict_index(kicked, ctx.chat.id)
                     if kicked['settings'][index]['warning_kick'] != 'None':
                         text = kicked['settings'][index]['warning_kick'].replace('{member_name}', ", ".join(kicked["kicked"])).replace('{admin}', f'<b>{ctx.from_user.first_name}</b>')
@@ -366,6 +397,8 @@ async def handler_to_kick(ctx: Message):
                 asyncio.create_task(delete_message(5, [trash.message_id], ctx.chat.id))
 
             asyncio.create_task(delete_message(5, [ctx.message_id], ctx.chat.id))
+        else:
+            await ctx.delete()
     except Exception as e:
         trash = ''
         if e.args[
